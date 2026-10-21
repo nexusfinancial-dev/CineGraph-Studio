@@ -84,10 +84,16 @@
         <span class="text-gray-300 font-medium font-mono">LM Studio: {{ lmOnline ? 'gemma-4-12b' : 'Offline' }}</span>
       </div>
 
+      <!-- ComfyUI Status -->
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-900 border border-gray-800 text-[11px]">
+        <span class="w-2 h-2 rounded-full" :class="comfyOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+        <span class="text-gray-300 font-medium font-mono">ComfyUI: {{ comfyOnline ? 'RTX 5060 Ti' : 'Offline' }}</span>
+      </div>
+
       <!-- Embedding Model -->
       <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-900 border border-gray-800 text-[11px]">
         <span class="w-2 h-2 rounded-full" :class="embedOnline ? 'bg-indigo-500' : 'bg-gray-600'"></span>
-        <span class="text-gray-300 font-medium font-mono">Embeddings: bge-m3 (1024d)</span>
+        <span class="text-gray-300 font-medium font-mono">Embeddings: bge-m3</span>
       </div>
 
       <!-- Studio Mode Switcher Link -->
@@ -550,12 +556,23 @@
               </div>
             </div>
 
-            <!-- ComfyUI Matte Plate Prompt Drawer -->
-            <div class="mt-auto pt-2 border-t border-gray-800 flex items-center justify-between">
-              <span class="text-[10px] font-mono text-emerald-400">ComfyUI Matte Painting Plate</span>
-              <button @click="copyPrompt(env.matte_painting_prompt || env.name)" class="px-2.5 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800/60 text-emerald-300 text-xs font-semibold transition">
-                📋 Copy Matte Prompt
-              </button>
+            <!-- ComfyUI Matte Plate Prompt Drawer (Krea 2 Turbo) -->
+            <div class="mt-auto pt-2 border-t border-gray-800 flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-mono text-emerald-400">ComfyUI Matte Painting Plate (Krea 2 Turbo)</span>
+                <div class="flex items-center gap-2">
+                  <button @click="copyPrompt(env.matte_painting_prompt || env.name)" class="px-2.5 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800/60 text-emerald-300 text-xs font-semibold transition">
+                    📋 Copy
+                  </button>
+                  <button @click="renderEnvironmentMatte(env)" :disabled="renderingEnvs[env.name]?.status === 'rendering' || !comfyOnline" class="px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-gray-950 text-xs font-bold transition disabled:opacity-50">
+                    <span v-if="renderingEnvs[env.name]?.status === 'rendering'">⏳ Rendering...</span>
+                    <span v-else>🏞️ Render Plate</span>
+                  </button>
+                </div>
+              </div>
+              <div v-if="renderingEnvs[env.name]?.status === 'success'" class="p-2 rounded-lg bg-emerald-950/40 border border-emerald-800/60 flex flex-col gap-1">
+                <img :src="renderingEnvs[env.name].primary_image" class="w-full max-h-48 object-cover rounded border border-gray-800" />
+              </div>
             </div>
           </div>
         </div>
@@ -710,14 +727,31 @@
               "{{ item.line_en }}"
             </div>
 
-            <!-- Acting / TTS Performance Directives -->
-            <div class="flex flex-col gap-1">
-              <div class="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                <span class="flex items-center gap-1">🎙️ Performance Directive (Qwen3-TTS / CosyVoice):</span>
-                <button @click="copyPrompt(item.performance_instruction + ' ' + item.line_en)" class="text-sky-400 hover:text-sky-300 font-semibold">Copy Line + Tag</button>
+            <!-- Acting / TTS Performance Directives (Qwen3-TTS) -->
+            <div class="flex flex-col gap-1.5">
+              <div class="flex items-center justify-between text-[10px] text-gray-400 font-bold flex-wrap gap-1">
+                <span class="flex items-center gap-1">🎙️ Performance Directive (Qwen3-TTS Voice Design):</span>
+                <div class="flex items-center gap-2">
+                  <button @click="copyPrompt(item.performance_instruction + ' ' + item.line_en)" class="text-sky-400 hover:text-sky-300 font-semibold">Copy Line</button>
+                  <button @click="renderScriptLineVoice(item)" :disabled="renderingVoices[item.id]?.status === 'rendering' || !comfyOnline" class="px-2.5 py-1 rounded bg-teal-500/20 hover:bg-teal-500 text-teal-300 hover:text-gray-950 text-[11px] font-bold transition flex items-center gap-1 disabled:opacity-50">
+                    <span v-if="renderingVoices[item.id]?.status === 'rendering'" class="animate-spin text-[10px]">⏳</span>
+                    <span v-else>🎙️</span>
+                    <span>{{ renderingVoices[item.id]?.status === 'rendering' ? 'Synthesizing...' : 'Render Voice (Qwen3-TTS)' }}</span>
+                  </button>
+                </div>
               </div>
               <div class="p-2 rounded-lg bg-sky-950/20 border border-sky-800/30 text-[11px] font-mono text-sky-200">
                 {{ item.performance_instruction }}
+              </div>
+              <div v-if="renderingVoices[item.id]?.status === 'success'" class="p-2 rounded-lg bg-teal-950/40 border border-teal-800/60 flex flex-col gap-1">
+                <div class="flex items-center justify-between text-[10px] text-teal-300 font-bold">
+                  <span>✅ Audio Synthesized (Qwen3-TTS):</span>
+                  <a :href="renderingVoices[item.id].primary_audio" target="_blank" download class="underline hover:text-white">Download WAV</a>
+                </div>
+                <audio controls class="w-full h-7" :src="renderingVoices[item.id].primary_audio"></audio>
+              </div>
+              <div v-else-if="renderingVoices[item.id]?.status === 'error'" class="text-[10px] text-rose-400 font-mono">
+                ❌ Voice Error: {{ renderingVoices[item.id].error }}
               </div>
             </div>
 
@@ -988,7 +1022,7 @@
 
             <!-- Dialogue & Spoken Line in Original English (if present) -->
             <div v-if="sh.dialogue" class="p-3.5 rounded-xl bg-gray-950/90 border border-gray-800 flex flex-col gap-2">
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                   <span :class="['text-xs font-bold px-2 py-0.5 rounded-md font-mono', getSpeakerBadgeClass(sh.dialogue.speaker)]">
                     👤 {{ sh.dialogue.speaker }}
@@ -997,9 +1031,16 @@
                     {{ sh.dialogue.words_count }} words · {{ sh.dialogue.speech_duration_seconds }}s speech @ 2.0 wps
                   </span>
                 </div>
-                <button @click="copyPrompt(sh.dialogue.performance_instruction + ' ' + sh.dialogue.line_en)" class="text-[11px] text-sky-400 hover:text-sky-300 font-medium flex items-center gap-1">
-                  <span>📋 Copy Line + Directive</span>
-                </button>
+                <div class="flex items-center gap-2">
+                  <button @click="copyPrompt(sh.dialogue.performance_instruction + ' ' + sh.dialogue.line_en)" class="text-[11px] text-sky-400 hover:text-sky-300 font-medium flex items-center gap-1">
+                    <span>📋 Copy</span>
+                  </button>
+                  <button @click="renderShotVoice(sh)" :disabled="renderingVoices[sh.shot_code]?.status === 'rendering' || !comfyOnline" class="px-2.5 py-1 rounded bg-teal-500/20 hover:bg-teal-500 text-teal-300 hover:text-gray-950 text-xs font-bold transition flex items-center gap-1 disabled:opacity-50">
+                    <span v-if="renderingVoices[sh.shot_code]?.status === 'rendering'" class="animate-spin text-xs">⏳</span>
+                    <span v-else>🎙️</span>
+                    <span>{{ renderingVoices[sh.shot_code]?.status === 'rendering' ? 'Synthesizing...' : 'Render Voice (Qwen3-TTS)' }}</span>
+                  </button>
+                </div>
               </div>
 
               <!-- The Spoken Line -->
@@ -1010,6 +1051,18 @@
               <!-- Acting Directive -->
               <div class="p-2 rounded-lg bg-sky-950/20 border border-sky-800/30 text-[11px] font-mono text-sky-200">
                 {{ sh.acting_directive }}
+              </div>
+
+              <!-- Audio Player when rendered -->
+              <div v-if="renderingVoices[sh.shot_code]?.status === 'success'" class="mt-2 p-2.5 rounded-lg bg-teal-950/40 border border-teal-800/60 flex flex-col gap-1.5">
+                <div class="flex items-center justify-between text-[11px] text-teal-300 font-bold">
+                  <span>✅ Qwen3-TTS Voiceprint Audio:</span>
+                  <a :href="renderingVoices[sh.shot_code].primary_audio" target="_blank" download class="text-[10px] underline hover:text-white">Download WAV</a>
+                </div>
+                <audio controls class="w-full h-8" :src="renderingVoices[sh.shot_code].primary_audio"></audio>
+              </div>
+              <div v-else-if="renderingVoices[sh.shot_code]?.status === 'error'" class="text-[11px] text-rose-400 font-mono">
+                ❌ Voice error: {{ renderingVoices[sh.shot_code].error }}
               </div>
             </div>
 
@@ -1029,19 +1082,94 @@
               </div>
             </div>
 
-            <!-- AI Video Prompt (MiniMax H3 / Kling / Runway Gen-3 Ready) -->
-            <div class="flex flex-col gap-1.5 pt-1">
-              <div class="flex items-center justify-between text-[11px] font-bold text-amber-400 uppercase tracking-wider">
-                <span class="flex items-center gap-1">
-                  <span>🎬 AI Video Generation Prompt (MiniMax H3 / Kling 1.5 / Runway Gen-3):</span>
-                </span>
-                <button @click="copyPrompt(sh.ai_video_prompt)" class="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-gray-950 text-xs font-bold transition flex items-center gap-1">
-                  <span>📋 Copy Video Prompt</span>
-                </button>
+            <!-- Multi-Model Generation Prompts (MiniMax H3 Video vs Krea 2 Turbo Keyframe) -->
+            <div class="flex flex-col gap-2 pt-1">
+              
+              <!-- Tabs Header -->
+              <div class="flex items-center justify-between border-b border-gray-800 pb-1.5 flex-wrap gap-2">
+                <div class="flex items-center gap-1.5">
+                  <button @click="activeShotPromptTab[sh.shot_code] = 'minimax'" :class="['px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5', (!activeShotPromptTab[sh.shot_code] || activeShotPromptTab[sh.shot_code] === 'minimax') ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50' : 'bg-gray-900 text-gray-400 hover:text-white']">
+                    <span>🎬 MiniMax H3 Video (6s-15s Ref2VA)</span>
+                  </button>
+                  <button @click="activeShotPromptTab[sh.shot_code] = 'krea'" :class="['px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeShotPromptTab[sh.shot_code] === 'krea' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' : 'bg-gray-900 text-gray-400 hover:text-white']">
+                    <span>🖼️ Krea 2 Turbo (Matte Keyframe)</span>
+                  </button>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center gap-2">
+                  <!-- MiniMax Actions -->
+                  <template v-if="!activeShotPromptTab[sh.shot_code] || activeShotPromptTab[sh.shot_code] === 'minimax'">
+                    <button @click="copyPrompt(sh.minimax_h3_prompt || sh.ai_video_prompt)" class="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-semibold transition flex items-center gap-1">
+                      <span>📋 Copy Prompt</span>
+                    </button>
+                    <button @click="renderShotVideo(sh)" :disabled="renderingVideos[sh.shot_code]?.status === 'rendering' || !comfyOnline" class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-gray-950 text-xs font-black transition flex items-center gap-1 disabled:opacity-50 shadow">
+                      <span v-if="renderingVideos[sh.shot_code]?.status === 'rendering'" class="animate-spin text-xs">⏳</span>
+                      <span v-else>⚡</span>
+                      <span>{{ renderingVideos[sh.shot_code]?.status === 'rendering' ? 'Rendering Video (RTX 5060 Ti)...' : 'Render Video (MiniMax H3)' }}</span>
+                    </button>
+                  </template>
+
+                  <!-- Krea Actions -->
+                  <template v-else-if="activeShotPromptTab[sh.shot_code] === 'krea'">
+                    <button @click="copyPrompt(sh.krea_prompt)" class="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-semibold transition flex items-center gap-1">
+                      <span>📋 Copy Prompt</span>
+                    </button>
+                    <button @click="renderShotKeyframe(sh)" :disabled="renderingKeyframes[sh.shot_code]?.status === 'rendering' || !comfyOnline" class="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-gray-950 text-xs font-black transition flex items-center gap-1 disabled:opacity-50 shadow">
+                      <span v-if="renderingKeyframes[sh.shot_code]?.status === 'rendering'" class="animate-spin text-xs">⏳</span>
+                      <span v-else>🖼️</span>
+                      <span>{{ renderingKeyframes[sh.shot_code]?.status === 'rendering' ? 'Generating Keyframe...' : 'Render Keyframe (Krea 2 Turbo)' }}</span>
+                    </button>
+                  </template>
+                </div>
               </div>
-              <div class="p-3 rounded-xl bg-black/60 border border-gray-800 font-mono text-[11px] text-gray-300 leading-relaxed select-all">
-                {{ sh.ai_video_prompt }}
+
+              <!-- MiniMax H3 View -->
+              <div v-if="!activeShotPromptTab[sh.shot_code] || activeShotPromptTab[sh.shot_code] === 'minimax'" class="flex flex-col gap-2">
+                <div class="flex items-center justify-between text-[10px] font-mono text-gray-400">
+                  <span class="text-amber-400 font-semibold">Model: Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors (TaoMate 3-Step)</span>
+                  <span>Duration: {{ sh.duration_seconds.toFixed(1) }}s</span>
+                </div>
+                <div class="p-3 rounded-xl bg-black/80 border border-gray-800 font-mono text-[11px] text-gray-300 whitespace-pre-wrap select-all leading-relaxed max-h-48 overflow-y-auto">
+                  {{ sh.minimax_h3_prompt || sh.ai_video_prompt }}
+                </div>
+
+                <!-- Video Preview If Rendered -->
+                <div v-if="renderingVideos[sh.shot_code]?.status === 'success'" class="p-3 rounded-xl bg-amber-950/30 border border-amber-800/60 flex flex-col gap-2">
+                  <div class="flex items-center justify-between text-xs font-bold text-amber-300">
+                    <span>🎬 Rendered Video Take ({{ sh.shot_code }}):</span>
+                    <a :href="renderingVideos[sh.shot_code].primary_video" target="_blank" download class="underline hover:text-white">Open / Download</a>
+                  </div>
+                  <video controls autoplay loop class="w-full max-h-80 rounded-lg bg-black border border-gray-800" :src="renderingVideos[sh.shot_code].primary_video"></video>
+                </div>
+                <div v-else-if="renderingVideos[sh.shot_code]?.status === 'error'" class="p-2.5 rounded-lg bg-rose-950/40 border border-rose-800 text-[11px] text-rose-300 font-mono">
+                  ❌ Render Error: {{ renderingVideos[sh.shot_code].error }}
+                </div>
               </div>
+
+              <!-- Krea 2 Turbo View -->
+              <div v-else-if="activeShotPromptTab[sh.shot_code] === 'krea'" class="flex flex-col gap-2">
+                <div class="flex items-center justify-between text-[10px] font-mono text-gray-400">
+                  <span class="text-emerald-400 font-semibold">Model: krea2_turbo_int8_convrot.safetensors (Concise Photographic Plate)</span>
+                  <span>16:9 Widescreen</span>
+                </div>
+                <div class="p-3 rounded-xl bg-black/80 border border-gray-800 font-mono text-[11px] text-gray-300 whitespace-pre-wrap select-all leading-relaxed">
+                  {{ sh.krea_prompt || sh.ai_video_prompt }}
+                </div>
+
+                <!-- Keyframe Image Preview If Rendered -->
+                <div v-if="renderingKeyframes[sh.shot_code]?.status === 'success'" class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/60 flex flex-col gap-2">
+                  <div class="flex items-center justify-between text-xs font-bold text-emerald-300">
+                    <span>🖼️ Rendered Matte Plate Keyframe:</span>
+                    <a :href="renderingKeyframes[sh.shot_code].primary_image" target="_blank" download class="underline hover:text-white">Download High-Res</a>
+                  </div>
+                  <img :src="renderingKeyframes[sh.shot_code].primary_image" class="w-full max-h-80 object-cover rounded-lg border border-gray-800" />
+                </div>
+                <div v-else-if="renderingKeyframes[sh.shot_code]?.status === 'error'" class="p-2.5 rounded-lg bg-rose-950/40 border border-rose-800 text-[11px] text-rose-300 font-mono">
+                  ❌ Keyframe Error: {{ renderingKeyframes[sh.shot_code].error }}
+                </div>
+              </div>
+
             </div>
 
           </div>
@@ -1093,8 +1221,16 @@ createApp({
   setup() {
     const lmOnline = ref(true);
     const embedOnline = ref(true);
+    const comfyOnline = ref(false);
     const activeTab = ref('pipeline');
     const isRunning = ref(false);
+
+    // ComfyUI Generation Reactive Tracking States
+    const renderingVoices = ref({});
+    const renderingKeyframes = ref({});
+    const renderingVideos = ref({});
+    const renderingEnvs = ref({});
+    const activeShotPromptTab = ref({});
     
     // Target Domain: 'character' vs 'voiceprint' vs 'environment' vs 'script'
     const targetType = ref('character');
@@ -1549,6 +1685,159 @@ createApp({
       addLog("[Clipboard] ComfyUI Prompt copied to clipboard!");
     };
 
+    // ==========================================
+    // COMFYUI PRODUCTION RENDERING API CALLS
+    // ==========================================
+    const checkComfyStatus = async () => {
+      try {
+        const res = await fetch('/api/comfy/status');
+        const data = await res.json();
+        comfyOnline.value = data.online === true;
+      } catch (e) {
+        comfyOnline.value = false;
+      }
+    };
+
+    const renderShotVoice = async (sh) => {
+      if (!sh.dialogue) return;
+      const key = sh.shot_code;
+      renderingVoices.value[key] = { status: 'rendering' };
+      addLog(`[ComfyUI] Synthesizing voice for ${sh.shot_code} via Qwen3-TTS Voice Design...`);
+      try {
+        const res = await fetch('/api/comfy/generate_voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            character_name: sh.dialogue.speaker,
+            line_en: sh.dialogue.line_en,
+            voice_description: sh.acting_directive || sh.dialogue.performance_instruction || "Clear cinematic dialogue delivery, grounded character tone",
+            shot_code: sh.shot_code
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.primary_audio) {
+          renderingVoices.value[key] = { status: 'success', primary_audio: data.primary_audio };
+          addLog(`[ComfyUI Success] Audio generated for ${sh.shot_code}: ${data.primary_audio}`);
+        } else {
+          renderingVoices.value[key] = { status: 'error', error: data.error || 'Generation failed' };
+          addLog(`[ComfyUI Error] Audio generation error: ${data.error || 'Failed'}`);
+        }
+      } catch (err) {
+        renderingVoices.value[key] = { status: 'error', error: err.message };
+        addLog(`[ComfyUI Error] ${err.message}`);
+      }
+    };
+
+    const renderShotKeyframe = async (sh) => {
+      const key = sh.shot_code;
+      renderingKeyframes.value[key] = { status: 'rendering' };
+      addLog(`[ComfyUI] Rendering keyframe image for ${sh.shot_code} via Krea 2 Turbo...`);
+      try {
+        const res = await fetch('/api/comfy/generate_environment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location_name: sh.location_name || sh.shot_code,
+            prompt_text: sh.krea_prompt || sh.ai_video_prompt,
+            aspect_ratio: "16:9 (Widescreen)"
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.primary_image) {
+          renderingKeyframes.value[key] = { status: 'success', primary_image: data.primary_image };
+          addLog(`[ComfyUI Success] Keyframe generated for ${sh.shot_code}: ${data.primary_image}`);
+        } else {
+          renderingKeyframes.value[key] = { status: 'error', error: data.error || 'Generation failed' };
+          addLog(`[ComfyUI Error] Keyframe error: ${data.error || 'Failed'}`);
+        }
+      } catch (err) {
+        renderingKeyframes.value[key] = { status: 'error', error: err.message };
+        addLog(`[ComfyUI Error] ${err.message}`);
+      }
+    };
+
+    const renderShotVideo = async (sh) => {
+      const key = sh.shot_code;
+      renderingVideos.value[key] = { status: 'rendering' };
+      addLog(`[ComfyUI] Rendering video take ${sh.shot_code} (${sh.duration_seconds}s) via MiniMax H3 Ref2VA...`);
+      try {
+        const res = await fetch('/api/comfy/generate_video_shot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shot_code: sh.shot_code,
+            prompt_6part: sh.minimax_h3_prompt || sh.ai_video_prompt,
+            duration_seconds: sh.duration_seconds || 8.0
+          })
+        });
+        const data = await res.json();
+        const vid = data.primary_video || (data.video_files && data.video_files[0]);
+        if (data.status === 'success' && vid) {
+          renderingVideos.value[key] = { status: 'success', primary_video: vid };
+          addLog(`[ComfyUI Success] Video generated for ${sh.shot_code}: ${vid}`);
+        } else {
+          renderingVideos.value[key] = { status: 'error', error: data.error || 'Generation failed' };
+          addLog(`[ComfyUI Error] Video error: ${data.error || 'Failed'}`);
+        }
+      } catch (err) {
+        renderingVideos.value[key] = { status: 'error', error: err.message };
+        addLog(`[ComfyUI Error] ${err.message}`);
+      }
+    };
+
+    const renderEnvironmentMatte = async (env) => {
+      const key = env.name;
+      renderingEnvs.value[key] = { status: 'rendering' };
+      addLog(`[ComfyUI] Rendering Matte Painting for ${env.name} via Krea 2 Turbo...`);
+      try {
+        const res = await fetch('/api/comfy/generate_environment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location_name: env.name,
+            prompt_text: env.matte_painting_prompt || env.architectural_style,
+            aspect_ratio: "16:9 (Widescreen)"
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.primary_image) {
+          renderingEnvs.value[key] = { status: 'success', primary_image: data.primary_image };
+          addLog(`[ComfyUI Success] Environment Matte generated for ${env.name}: ${data.primary_image}`);
+        } else {
+          renderingEnvs.value[key] = { status: 'error', error: data.error || 'Failed' };
+        }
+      } catch (err) {
+        renderingEnvs.value[key] = { status: 'error', error: err.message };
+      }
+    };
+
+    const renderScriptLineVoice = async (item) => {
+      const key = item.id;
+      renderingVoices.value[key] = { status: 'rendering' };
+      addLog(`[ComfyUI] Synthesizing script line ${item.id} via Qwen3-TTS Voice Design...`);
+      try {
+        const res = await fetch('/api/comfy/generate_voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            character_name: item.speaker || "Narrator",
+            line_en: item.line_en,
+            voice_description: item.performance_instruction || "Natural conversational tone",
+            shot_code: item.id
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.primary_audio) {
+          renderingVoices.value[key] = { status: 'success', primary_audio: data.primary_audio };
+          addLog(`[ComfyUI Success] Voice generated for ${item.id}: ${data.primary_audio}`);
+        } else {
+          renderingVoices.value[key] = { status: 'error', error: data.error || 'Failed' };
+        }
+      } catch (err) {
+        renderingVoices.value[key] = { status: 'error', error: err.message };
+      }
+    };
+
     const fetchBooks = async () => {
       try {
         const res = await fetch('/api/books');
@@ -1578,10 +1867,12 @@ createApp({
       fetchScriptData();
       fetchLockedScenes();
       fetchLockedMicroScenes();
+      checkComfyStatus();
+      setInterval(checkComfyStatus, 15000);
     });
 
     return {
-      lmOnline, embedOnline, activeTab, isRunning,
+      lmOnline, embedOnline, comfyOnline, checkComfyStatus, activeTab, isRunning,
       targetType, executionMode, targetCharacterName,
       envExecutionMode, targetLocationName,
       scriptScope, scriptCharacter, scriptFilter, scriptData, filteredScriptItems,
@@ -1593,7 +1884,9 @@ createApp({
       autoCanonMode, books, selectedBook, selectedBookInfo, onBookSelected,
       pipelineSteps, logs, logContainer, clearLogs, getLogColor, getStepClass, getStepIcon,
       lockedCharacters, lockedEnvironments, pendingConflicts, openResetModal, closeResetModal,
-      executeStudioReset, runProductionAgent, resolveConflict, copyPrompt
+      executeStudioReset, runProductionAgent, resolveConflict, copyPrompt,
+      renderingVoices, renderingKeyframes, renderingVideos, renderingEnvs, activeShotPromptTab,
+      renderShotVoice, renderShotKeyframe, renderShotVideo, renderEnvironmentMatte, renderScriptLineVoice
     };
   }
 }).mount('#app');

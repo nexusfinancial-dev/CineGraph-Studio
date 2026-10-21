@@ -3747,8 +3747,131 @@ def run_micro_scenes_endpoint(req: MicroSceneRunRequest):
         }
 
 
+# ==========================================
+# COMFYUI STUDIO GENERATION & AUTOMATION ENDPOINTS
+# ==========================================
+
+COMFY_AUDIO_DIR = r"C:\ComfyUI_windows_portable\ComfyUI\output\audio"
+COMFY_ENV_DIR = r"C:\ComfyUI_windows_portable\ComfyUI\output\environments"
+COMFY_VIDEO_DIR = r"C:\ComfyUI_windows_portable\ComfyUI\output\video"
+
+os.makedirs(COMFY_AUDIO_DIR, exist_ok=True)
+os.makedirs(COMFY_ENV_DIR, exist_ok=True)
+os.makedirs(COMFY_VIDEO_DIR, exist_ok=True)
+
+class ComfyVoiceRequest(BaseModel):
+    character_name: str
+    line_en: str
+    voice_description: str
+    shot_code: Optional[str] = None
+
+@app.post("/api/comfy/generate_voice")
+def comfy_generate_voice(req: ComfyVoiceRequest):
+    import comfy_studio_engine
+    if not comfy_studio_engine.is_comfy_online():
+        raise HTTPException(status_code=503, detail="ComfyUI server is offline on 127.0.0.1:8188")
+    try:
+        res = comfy_studio_engine.generate_voice_qwen(
+            character_name=req.character_name,
+            line_en=req.line_en,
+            voice_description=req.voice_description,
+            shot_code=req.shot_code
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ComfyEnvRequest(BaseModel):
+    location_name: str
+    prompt_text: str
+    aspect_ratio: Optional[str] = "16:9 (Widescreen)"
+
+@app.post("/api/comfy/generate_environment")
+def comfy_generate_environment(req: ComfyEnvRequest):
+    import comfy_studio_engine
+    if not comfy_studio_engine.is_comfy_online():
+        raise HTTPException(status_code=503, detail="ComfyUI server is offline on 127.0.0.1:8188")
+    try:
+        res = comfy_studio_engine.generate_environment_krea(
+            location_name=req.location_name,
+            prompt_text=req.prompt_text,
+            aspect_ratio=req.aspect_ratio or "16:9 (Widescreen)"
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ComfyActorOutfitRequest(BaseModel):
+    character_name: str
+    portrait_filename: str
+    outfit_prompt: str
+    aspect_ratio: Optional[str] = "9:16 (Portrait Widescreen)"
+
+@app.post("/api/comfy/generate_actor_outfit")
+def comfy_generate_actor_outfit(req: ComfyActorOutfitRequest):
+    import comfy_studio_engine
+    if not comfy_studio_engine.is_comfy_online():
+        raise HTTPException(status_code=503, detail="ComfyUI server is offline on 127.0.0.1:8188")
+    try:
+        res = comfy_studio_engine.generate_actor_outfit_krea(
+            character_name=req.character_name,
+            portrait_filename=req.portrait_filename,
+            outfit_prompt=req.outfit_prompt,
+            aspect_ratio=req.aspect_ratio or "9:16 (Portrait Widescreen)"
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ComfyVideoShotRequest(BaseModel):
+    shot_code: str
+    prompt_6part: str
+    duration_seconds: Optional[float] = 8.0
+    actor_image_filename: Optional[str] = None
+    env_image_filename: Optional[str] = None
+    audio_filename: Optional[str] = None
+
+@app.post("/api/comfy/generate_video_shot")
+def comfy_generate_video_shot(req: ComfyVideoShotRequest):
+    import comfy_studio_engine
+    if not comfy_studio_engine.is_comfy_online():
+        raise HTTPException(status_code=503, detail="ComfyUI server is offline on 127.0.0.1:8188")
+    try:
+        res = comfy_studio_engine.generate_video_shot_minimax(
+            shot_code=req.shot_code,
+            prompt_6part=req.prompt_6part,
+            duration_seconds=req.duration_seconds or 8.0,
+            actor_image_filename=req.actor_image_filename,
+            env_image_filename=req.env_image_filename,
+            audio_filename=req.audio_filename
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/comfy/status")
+def comfy_status():
+    import comfy_studio_engine
+    online = comfy_studio_engine.is_comfy_online()
+    return {
+        "online": online,
+        "url": comfy_studio_engine.COMFY_URL,
+        "workflows": {
+            "voice_qwen3": os.path.exists(comfy_studio_engine.WF_VOICE_PATH),
+            "env_krea2": os.path.exists(comfy_studio_engine.WF_ENV_PATH),
+            "actor_outfit_krea2": os.path.exists(comfy_studio_engine.WF_ACTOR_OUTFIT_PATH),
+            "portrait_krea2": os.path.exists(comfy_studio_engine.WF_PORTRAIT_PATH),
+            "video_minimax_h3": os.path.exists(comfy_studio_engine.WF_VIDEO_PATH)
+        }
+    }
+
+
 app.mount("/outfits", StaticFiles(directory=COMFY_OUTFITS_DIR), name="outfits")
+app.mount("/character_outfits", StaticFiles(directory=COMFY_OUTFITS_DIR), name="character_outfits")
 app.mount("/portraits", StaticFiles(directory=COMFY_PORTRAITS_DIR), name="portraits")
+app.mount("/audio", StaticFiles(directory=COMFY_AUDIO_DIR), name="audio")
+app.mount("/environments", StaticFiles(directory=COMFY_ENV_DIR), name="environments")
+app.mount("/video", StaticFiles(directory=COMFY_VIDEO_DIR), name="video")
 os.makedirs("static", exist_ok=True)
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 

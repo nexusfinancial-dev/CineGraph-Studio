@@ -1,0 +1,479 @@
+{
+  "2": {
+    "inputs": {
+      "value": "subject_definitions:\n\n<Subject 1>: The young woman from <Picture 1> with long dark wavy hair, wearing the rustic off-the-shoulder linen dress, framed in soft moonlit chiaroscuro beneath the willow branches.\n<Subject 2>: The young man from <Picture 2> in his cream linen shirt with rolled-up sleeves, standing close in deep forest shadows.\n<Subject 3>: The secluded moonlit haven beneath the weeping willow from <Picture 3>, draped in thick curtains of trailing fronds swaying in the night mist, with silvery backlight filtering through the canopy.\n\nsummary:\n[reference generation] Continuing directly from their embrace, <Subject 2> and <Subject 1> share a deeply intimate, shadowed moment sheltered beneath the weeping willow <Subject 3>, where dramatic moonlight contours and drifting foliage frame their quiet devotion.\n\nretention_analysis:\n\n<Subject 1> (appears in [Shot 1], [Shot 2]): fully_preserved - facial features, hair, and linen dress from <Picture 1> are maintained in silhouette and rim lighting.\n<Subject 2> (appears in [Shot 1], [Shot 2]): fully_preserved - facial features and linen shirt from <Picture 2> are maintained.\n<Subject 3> (appears in [Shot 1], [Shot 2]): fully_preserved - the weeping willow canopy, carved heart trunk, and nocturnal moonlight from <Picture 3> define the environment.\n\ndetailed_description:\nThe target video is in a poetic Baltic gothic cinematic style, utilizing high-contrast chiaroscuro lighting, deep shadows, and cool moonlight highlights on 35mm film.\n[Shot 1] Following directly from their kiss under the canopy of <Subject 3>, the camera glides slowly behind a veil of swaying willow fronds. <Subject 2> and <Subject 1> remain locked in a tight, breathless embrace against the rough bark near the carved heart. Strong moonlight carves sharp silver highlights along their jawlines and the contours of their shoulders, casting the surrounding forest into velvet darkness. <Subject 1> rests her head against his chest, her dark hair catching the cool moonbeams as her fingers clutch the fabric of his linen shirt.\n[Shot 2] At 00:07.500, the shot transitions to a close-up backlit profile. The bright silver moonlight forms glowing rims around their silhouettes. <Subject 2> rests his forehead gently against hers, their eyes closed in profound stillness. A sudden gust of midnight wind stirs the long hanging willow leaves, sweeping them across the frame like a dark curtain. Their slow, shared breathing forms faint, visible vapor in the Baltic chill, fading softly into the darkness until 00:15.000.\n\noverall_soundscape:\nThe soft rustling of dense willow leaves brushing against each other, the distant low murmur of the Gauja river in the night, the quiet whistle of a cold breeze through the branches, and the slow, calm rhythm of shared breathing in the nocturnal chill.\n\nnon_diegetic_music:\nA tender, haunting cinematic score led by a distant solo cello and delicate piano notes, accompanied by warm ambient string pads that evoke deep emotional intimacy, quiet mystery, and gothic romance."
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "提示词"
+    }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "4": {
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "11": {
+    "inputs": {
+      "prompt": [
+        "2",
+        0
+      ],
+      "width": [
+        "20",
+        0
+      ],
+      "height": [
+        "20",
+        1
+      ],
+      "length": [
+        "19",
+        1
+      ],
+      "ref_image_size": "match",
+      "clip": [
+        "15",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "audio_vae": [
+        "4",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "221",
+        0
+      ],
+      "ref_images.ref_image_1": [
+        "211",
+        0
+      ],
+      "ref_images.ref_image_2": [
+        "212",
+        0
+      ],
+      "ref_audios.ref_audio_0": [
+        "222",
+        0
+      ],
+      "ref_audios.ref_audio_1": [
+        "223",
+        0
+      ],
+      "ref_audios.ref_audio_2": [
+        "224",
+        0
+      ],
+      "ref_images.ref_image_3": [
+        "213",
+        0
+      ],
+      "ref_images.ref_image_4": [
+        "214",
+        0
+      ],
+      "ref_images.ref_image_5": [
+        "215",
+        0
+      ],
+      "ref_images.ref_image_6": [
+        "216",
+        0
+      ],
+      "ref_images.ref_image_7": [
+        "217",
+        0
+      ],
+      "ref_images.ref_image_8": [
+        "218",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "MiniMax H3 Reference to Video"
+    }
+  },
+  "15": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "17": {
+    "inputs": {
+      "value": 15
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "Float (Duration)"
+    }
+  },
+  "19": {
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "17",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "Math Expression"
+    }
+  },
+  "20": {
+    "inputs": {
+      "aspect_ratio": "16:9 (Widescreen)",
+      "megapixels": 0.7,
+      "multiple": 32
+    },
+    "class_type": "ResolutionSelector",
+    "_meta": {
+      "title": "Resolution Selector (Size)-1pass"
+    }
+  },
+  "30": {
+    "inputs": {
+      "unet_name": "Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "121": {
+    "inputs": {
+      "lora_name": "minimax_h3_taomate_3step_lora_avg_rank_19_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "226",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "122": {
+    "inputs": {
+      "model": [
+        "121",
+        0
+      ],
+      "conditioning": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Basic Guider"
+    }
+  },
+  "123": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "124": {
+    "inputs": {
+      "scheduler": "beta",
+      "steps": 3,
+      "denoise": 1,
+      "model": [
+        "121",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  },
+  "125": {
+    "inputs": {
+      "noise": [
+        "129",
+        0
+      ],
+      "guider": [
+        "122",
+        0
+      ],
+      "sampler": [
+        "123",
+        0
+      ],
+      "sigmas": [
+        "124",
+        0
+      ],
+      "latent_image": [
+        "11",
+        1
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "129": {
+    "inputs": {
+      "noise_seed": 537234677462603
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "131": {
+    "inputs": {
+      "samples": [
+        "125",
+        1
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "133": {
+    "inputs": {
+      "samples": [
+        "125",
+        1
+      ],
+      "vae": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "VAE Decode Audio"
+    }
+  },
+  "135": {
+    "inputs": {
+      "frame_rate": 24,
+      "loop_count": 0,
+      "filename_prefix": "minimaxh3",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "131",
+        0
+      ],
+      "audio": [
+        "133",
+        0
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  },
+  "211": {
+    "inputs": {
+      "image": "07_gatis_matchmaking_suit.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "212": {
+    "inputs": {
+      "image": "14_dark_forest_willow_tree_00001.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "213": {
+    "inputs": {
+      "image": "2026-09-18-10h51m19s_seed458883499_Full-length standing body shot of the cute chubby.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "214": {
+    "inputs": {
+      "image": "2026-09-18-20h36m21s_seed521068115_A 3D Disney Pixar style master bedroom interior ba.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "215": {
+    "inputs": {
+      "image": "2026-09-18-20h36m59s_seed196975128_A 3D Disney Pixar style modern home kitchen interi.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "216": {
+    "inputs": {
+      "image": "2026-09-18-20h37m36s_seed591233947_A 3D Disney Pixar style home office interior backg.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "217": {
+    "inputs": {
+      "image": "2026-09-18-20h38m14s_seed383066521_A 3D Disney Pixar style cozy living room interior.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "218": {
+    "inputs": {
+      "image": "2026-09-18-20h38m51s_seed301257033_A 3D Disney Pixar style residential hallway corrid.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "221": {
+    "inputs": {
+      "image": "03_zozanka_homestead_dress.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "222": {
+    "inputs": {
+      "audio": "1_Khaloona_N3teref_En_Ehna_Etghafalna_(Vocals)00000402.wav"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  },
+  "223": {
+    "inputs": {
+      "audio": "1_Khaloona_N3teref_En_Ehna_Etghafalna_(Vocals)00000402.wav"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  },
+  "224": {
+    "inputs": {
+      "audio": "1_Khaloona_N3teref_En_Ehna_Etghafalna_(Vocals)00000402.wav"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  },
+  "226": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "Model Attention Backend"
+    }
+  },
+  "228": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.scale": 2,
+      "quality": "ULTRA",
+      "images": [
+        "131",
+        0
+      ]
+    },
+    "class_type": "RTXVideoSuperResolution",
+    "_meta": {
+      "title": "RTX Video Super Resolution Pro"
+    }
+  },
+  "229": {
+    "inputs": {
+      "frame_rate": 24,
+      "loop_count": 0,
+      "filename_prefix": "minimaxh3",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "228",
+        0
+      ],
+      "audio": [
+        "133",
+        0
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  }
+}

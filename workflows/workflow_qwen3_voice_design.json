@@ -1,0 +1,50 @@
+{
+  "1": {
+    "inputs": {
+      "text": "Hello, this is a test.",
+      "voice_description": "A warm, gentle young female voice with clear pronunciation.",
+      "language": "Auto",
+      "seed": 499766295349708,
+      "max_new_tokens": 2048,
+      "temperature": 1,
+      "top_p": 0.8,
+      "repetition_penalty": 1.1,
+      "model": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "Qwen3TTSVoiceDesign",
+    "_meta": {
+      "title": "Qwen3 TTS Voice Design"
+    }
+  },
+  "2": {
+    "inputs": {
+      "model_name": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "keep_model_loaded": true,
+      "use_flash_attn": true
+    },
+    "class_type": "Qwen3TTSModelLoader",
+    "_meta": {
+      "title": "Qwen3 TTS Model Loader"
+    }
+  },
+  "3": {
+    "inputs": {
+      "filename_prefix": "audio/ComfyUI",
+      "format": "mp3",
+      "format.quality": "320k",
+      "audio": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "SaveAudioAdvanced",
+    "_meta": {
+      "title": "Save Audio (Advanced)"
+    }
+  }
+}

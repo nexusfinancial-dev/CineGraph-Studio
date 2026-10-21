@@ -56,6 +56,8 @@ class MicroSceneShot(BaseModel):
     visual_action: str = Field(description="Precise chronological actor movement and blocking across this 6-15s take")
     soundscape_and_foley: str = Field(description="Ambient soundscape, diegetic audio, and foley effects aligned to this take")
     ai_video_prompt: str = Field(description="Production-ready prompt for AI video generators (MiniMax H3 / Kling / Runway Gen-3)")
+    minimax_h3_prompt: str = Field(default="", description="Official 6-section MiniMax H3 Ref2VA multimodal prompt")
+    krea_prompt: str = Field(default="", description="High-speed Krea 2 Turbo visual concept prompt without buzzwords")
     acting_directive: str = Field(description="Acting instructions synchronized with the 2 words/sec cadence")
 
 class MicroSceneBible(BaseModel):
@@ -129,6 +131,65 @@ CAMERA_FRAMINGS = [
 # ==========================================
 # 3. Micro-Scene Decomposition Algorithm
 # ==========================================
+
+def build_minimax_h3_prompt(
+    speaker: str,
+    loc_name: str,
+    tod: str,
+    shot_action: str,
+    duration_sec: float,
+    cam_setup: dict,
+    line_en: str = "",
+    soundscape: str = ""
+) -> str:
+    dur_str = f"{duration_sec:.1f}s"
+    if line_en:
+        return (
+            f"subject_definitions:\n\n"
+            f"<Subject 1>: {speaker} from <Picture 1>, framed in {tod.lower()} lighting.\n"
+            f"<Subject 2>: The environment from <Picture 2>, {loc_name}.\n"
+            f"<Audio 1>: The dialogue audio track providing {speaker}'s voice and delivery.\n\n"
+            f"summary:\n"
+            f"[reference generation] In {loc_name}, {speaker} (<Subject 1>) delivers dialogue with lip synchronization matching <Audio 1> across {dur_str}.\n\n"
+            f"retention_analysis:\n"
+            f"- {speaker}'s facial features, hair, and costume from <Picture 1> are fully preserved.\n"
+            f"- The spatial geometry and lighting of {loc_name} from <Picture 2> are fully preserved.\n"
+            f"- <Audio 1> voice delivery directly drives {speaker}'s facial articulation and lip sync.\n\n"
+            f"detailed_description:\n"
+            f"The target video is in a 35mm anamorphic cinematic style.\n"
+            f"[00:00 - {duration_sec:05.2f}]\n"
+            f"{cam_setup['type']}. {cam_setup['motion']}. "
+            f"{speaker} (<Subject 1>) stands in {loc_name}. {shot_action} "
+            f"(S1) <d>{line_en}</d>\n\n"
+            f"overall_soundscape:\n"
+            f"{soundscape}, natural room acoustics, subtle actor foley.\n\n"
+            f"non_diegetic_music:\n"
+            f"Subtle atmospheric cinematic string pad supporting dramatic tension."
+        )
+    else:
+        return (
+            f"subject_definitions:\n\n"
+            f"<Subject 1>: The environment from <Picture 2>, {loc_name} at {tod}.\n\n"
+            f"summary:\n"
+            f"[reference generation] Generate a {dur_str} cinematic shot in {loc_name}.\n\n"
+            f"retention_analysis:\n"
+            f"- Architectural geometry and lighting from <Picture 2> are fully preserved.\n\n"
+            f"detailed_description:\n"
+            f"The target video is in a 24mm anamorphic wide cinematic style.\n"
+            f"[00:00 - {duration_sec:05.2f}]\n"
+            f"{cam_setup['type']}. {cam_setup['motion']}. {shot_action}\n\n"
+            f"overall_soundscape:\n"
+            f"{soundscape}\n\n"
+            f"non_diegetic_music:\n"
+            f"A low resonant ambient drone, creating cinematic mood."
+        )
+
+
+def build_krea_prompt(subject: str, loc_name: str, tod: str, action: str, cam_setup: dict) -> str:
+    """Clean natural language prompt under 50 words without banned buzzwords for Krea 2 Turbo."""
+    clean_action = action.replace('"', '').strip()
+    return f"Cinematic {cam_setup['framing'].lower()} of {subject} in {loc_name}, {tod.lower()} lighting. {clean_action}. 35mm lens, natural film texture, soft studio key light."
+
 
 def calculate_speech_and_shot_duration(
     words_count: int,
@@ -234,6 +295,13 @@ def generate_micro_scenes_from_master(
             f"Location: {loc_name}. Atmosphere: {tod} lighting, volumetric depth, anamorphic lens flares. "
             f"Scene Action: {opening_action}. Photorealistic 8k, cinematic color grading, 24fps motion blur."
         )
+        opening_minimax = build_minimax_h3_prompt(
+            speaker="", loc_name=loc_name, tod=tod, shot_action=opening_action,
+            duration_sec=8.0, cam_setup=cam_setup, soundscape=soundscape
+        )
+        opening_krea = build_krea_prompt(
+            subject=loc_name, loc_name=loc_name, tod=tod, action=opening_action, cam_setup=cam_setup
+        )
 
         all_micro_shots.append(MicroSceneShot(
             id=f"sh_{sc_num:02d}_{shot_in_scene:02d}_{uuid.uuid4().hex[:4]}",
@@ -255,6 +323,8 @@ def generate_micro_scenes_from_master(
             visual_action=opening_action,
             soundscape_and_foley=f"Opening ambiance: {soundscape}",
             ai_video_prompt=opening_prompt,
+            minimax_h3_prompt=opening_minimax,
+            krea_prompt=opening_krea,
             acting_directive="[Instruction: Silent opening establishing take, atmospheric poise, zero spoken dialogue]"
         ))
         shot_in_scene += 1
@@ -302,6 +372,14 @@ def generate_micro_scenes_from_master(
                         f"Lighting: dramatic cinematic key light with soft rim fill. 8k photorealistic, 24fps motion."
                     )
 
+                    minimax_prompt = build_minimax_h3_prompt(
+                        speaker=speaker, loc_name=loc_name, tod=tod, shot_action=shot_action,
+                        duration_sec=total_dur, cam_setup=cam_setup, line_en=line_part, soundscape=soundscape
+                    )
+                    krea_prompt = build_krea_prompt(
+                        subject=speaker, loc_name=loc_name, tod=tod, action=shot_action, cam_setup=cam_setup
+                    )
+
                     dlg_obj = MicroSceneDialogue(
                         speaker=speaker,
                         line_en=line_part,
@@ -333,6 +411,8 @@ def generate_micro_scenes_from_master(
                         visual_action=shot_action,
                         soundscape_and_foley=f"Foley cues: subtle clothing rustle, breath intake, {soundscape}",
                         ai_video_prompt=video_prompt,
+                        minimax_h3_prompt=minimax_prompt,
+                        krea_prompt=krea_prompt,
                         acting_directive=sync_acting_directive
                     ))
                     shot_in_scene += 1
@@ -348,6 +428,13 @@ def generate_micro_scenes_from_master(
                 action_prompt = (
                     f"Cinematic {cam_setup['lens']} {cam_setup['framing'].lower()} shot. {cam_setup['motion']}. "
                     f"Setting: {loc_name}, {tod}. Action: {beat_text}. Photorealistic 8k, volumetric atmosphere."
+                )
+                action_minimax = build_minimax_h3_prompt(
+                    speaker="", loc_name=loc_name, tod=tod, shot_action=beat_text,
+                    duration_sec=7.0, cam_setup=cam_setup, soundscape=soundscape
+                )
+                action_krea = build_krea_prompt(
+                    subject=cast[0] if cast else loc_name, loc_name=loc_name, tod=tod, action=beat_text, cam_setup=cam_setup
                 )
 
                 all_micro_shots.append(MicroSceneShot(
@@ -370,6 +457,8 @@ def generate_micro_scenes_from_master(
                     visual_action=beat_text,
                     soundscape_and_foley=f"Dynamic action foley: footsteps, atmospheric reverberation, {soundscape}",
                     ai_video_prompt=action_prompt,
+                    minimax_h3_prompt=action_minimax,
+                    krea_prompt=action_krea,
                     acting_directive="[Instruction: Visual action beat without dialogue, dramatic body language]"
                 ))
                 shot_in_scene += 1
@@ -386,6 +475,13 @@ def generate_micro_scenes_from_master(
             f"Cinematic {cam_setup['lens']} dramatic closing shot. {cam_setup['motion']}. "
             f"Setting: {loc_name}, {tod}. Visual: {closing_beat}. Camera lingers on character's resolved expression. "
             f"8k cinematic color grading, lens flare, 24fps motion."
+        )
+        closing_minimax = build_minimax_h3_prompt(
+            speaker="", loc_name=loc_name, tod=tod, shot_action=closing_beat,
+            duration_sec=6.5, cam_setup=cam_setup, soundscape=soundscape
+        )
+        closing_krea = build_krea_prompt(
+            subject=cast[0] if cast else loc_name, loc_name=loc_name, tod=tod, action=closing_beat, cam_setup=cam_setup
         )
 
         all_micro_shots.append(MicroSceneShot(
@@ -408,6 +504,8 @@ def generate_micro_scenes_from_master(
             visual_action=f"Scene button: {closing_beat}",
             soundscape_and_foley=f"Decaying reverb, settling foley, {soundscape}",
             ai_video_prompt=closing_prompt,
+            minimax_h3_prompt=closing_minimax,
+            krea_prompt=closing_krea,
             acting_directive="[Instruction: Concluding reaction beat, subtle dramatic realization, zero spoken dialogue]"
         ))
         global_idx += 1
