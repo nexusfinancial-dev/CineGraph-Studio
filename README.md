@@ -39,19 +39,19 @@ Generative AI video models (Runway, Kling, Sora, MiniMax H3) have unlocked hyper
    │  └───────────────────────┘   └────────────────────────┘ │
    └───────────────────────────┬─────────────────────────────┘
                                │
-            ┌──────────────────┼──────────────────┐
-            ▼                  ▼                  ▼
-   ┌─────────────────┐┌─────────────────┐┌─────────────────┐
-   │ Character Bible ││Environment Bible││Voiceprint Studio│
-   │  (#FFFFFF Void  ││ (24mm Anamorphic││  (5D Acoustic   │
-   │ Portrait Prompt)││  Matte Plates)  ││  Voice Design)  │
-   └────────┬────────┘└────────┬────────┘└────────┬────────┘
-            │                  │                  │
-            ▼                  ▼                  ▼
-   ┌─────────────────┐┌─────────────────┐┌─────────────────┐
-   │ ComfyUI / Flux  ││ ComfyUI / Krea  ││ Qwen3-TTS /     │
-   │ InstantID / IP  ││ Matte Plate Gen ││ CosyVoice TTS   │
-   └─────────────────┘└─────────────────┘└─────────────────┘
+            ┌──────────────────┼──────────────────┬──────────────────┐
+            ▼                  ▼                  ▼                  ▼
+   ┌─────────────────┐┌─────────────────┐┌─────────────────┐┌─────────────────┐
+   │ Character Bible ││Environment Bible││Audio Screenplay ││ Complete Scenes │
+   │  (#FFFFFF Void  ││ (24mm Anamorphic││(Dialogues / V.O.││ (Sluglines, 4-  │
+   │ Portrait Prompt)││  Matte Plates)  ││ & Narrator)     ││ Beats & Frames) │
+   └────────┬────────┘└────────┬────────┘└────────┬────────┘└────────┬────────┘
+            │                  │                  │                  │
+            ▼                  ▼                  ▼                  ▼
+   ┌─────────────────┐┌─────────────────┐┌─────────────────┐┌─────────────────┐
+   │ ComfyUI / Flux  ││ ComfyUI / Krea  ││ Qwen3-TTS /     ││ ComfyUI Keyframe│
+   │ InstantID / IP  ││ Matte Plate Gen ││ CosyVoice TTS   ││ Sequencing      │
+   └─────────────────┘└─────────────────┘└─────────────────┘└─────────────────┘
 ```
 
 ---
@@ -80,7 +80,17 @@ Generative AI video models (Runway, Kling, Sora, MiniMax H3) have unlocked hyper
 * **Narrator Exposition:** Extracts establishing narrative prose describing sensory ambiance, lighting, and world transitions, matched with 24mm anamorphic cinematic camera beats and a dedicated Narrator Voice Profile.
 * **Screenplay JSON Export:** Exports complete audio screenplay bibles ready for batch voice generation or speech alignment.
 
-### 5. ⚖️ Human-in-the-Loop (HITL) Conflict Arbitration
+### 5. 🎬 Hollywood Complete Scene Breakdown & Sequential Keyframing
+* **Screenplay Sluglines:** Generates canonical industry sluglines formatted as `INT./EXT. LOCATION - TIME OF DAY` grounded in spatial environments.
+* **Active Cast Detection:** Tracks which characters are physically present on screen per scene beat.
+* **Dramatic Tension & Synopsis:** Defines dramatic objectives and concise visual summaries for directors.
+* **4-Beat Sequential Action & Actor Blocking:** Structures each scene into numbered physical choreography and actor movements.
+* **Integrated Dialogue & Voice-Over Sequence:** Interweaves spoken lines and inner monologues in chronological story order.
+* **Ambient Soundscape & Foley:** Formulates detailed acoustic environment layers (e.g., *electronic hum, dripping water, distant crowd roar*).
+* **Compiled ComfyUI / Flux Cinematic Prompts:** Pre-compiles dual shot keyframes (24mm anamorphic wide establishing + 50mm medium dramatic) with aspect ratio, film grain, and camera angle tags ready for one-click generation.
+* **Verbatim Novel Scene Evidence:** Stores unaltered excerpt citations to prove canonical narrative truth.
+
+### 6. ⚖️ Human-in-the-Loop (HITL) Conflict Arbitration
 * When the manuscript contains contradictory descriptions (e.g., green-skinned nymph vs. human camouflage, or eye color variance under different lighting), the LangGraph engine halts execution and flags the discrepancy.
 * The director resolves the ambiguity via the interactive UI modal before the canonical bible is permanently locked.
 
@@ -93,6 +103,8 @@ CineGraph Studio AI features a dedicated, zero-latency director dashboard served
 * **Pipeline Execution Monitor:** Real-time terminal streaming of GraphRAG retrieval and node execution.
 * **Character Bible View:** Visual badges, biological traits, copy-ready ComfyUI prompts, and voiceprint cards.
 * **Environment Bible View:** Architectural breakdowns, sensory cues, and anamorphic matte painting prompts.
+* **Audio Script & Narration View:** Filterable tabs for spoken dialogue, voice-overs, and narrator chunks with performance directives.
+* **Complete Scenes Breakdown View:** Full Hollywood scene cards with sluglines, actor blocking, dialogue sequences, foley soundscapes, and ComfyUI keyframe cards.
 * **Dynamic Book Library:** Seamlessly scans, reads, and processes any EPUB or TXT file placed in `data/books/`.
 * **Zero Canvas Reset:** Reset databases to a clean slate with a single click.
 
@@ -140,6 +152,12 @@ python voiceprint_production.py "Mamba" "graphrag_workspace/input/my_novel.txt"
 
 # Run environment matte plate extraction
 python environment_production_graph.py "Meteoropolis Laboratories" "graphrag_workspace/input/my_novel.txt"
+
+# Run dialogue, voice-over & narrator extraction
+python dialogue_production_graph.py --book "Solar Dragons Need Love Too 1"
+
+# Run complete Hollywood scene breakdown extraction
+python scene_production_graph.py --book "Solar Dragons Need Love Too 1" --scenes 12
 ```
 
 ---
@@ -152,6 +170,8 @@ cinegraph-studio-ai/
 ├── novel_production_graph.py        # LangGraph Character StateGraph & HITL engine
 ├── environment_production_graph.py  # LangGraph Environment & Matte Plate engine
 ├── voiceprint_production.py         # 5D Voice Design & English dialogue extractor
+├── dialogue_production_graph.py     # Dialogue, V.O. & Narrator extraction graph
+├── scene_production_graph.py        # Complete Hollywood scene breakdown engine
 ├── run_agent.py                     # Headless CLI pipeline runner
 ├── Run_Studio.bat                   # One-click Windows studio launcher
 ├── requirements.txt                 # Production dependencies
@@ -164,6 +184,8 @@ cinegraph-studio-ai/
 ├── data/
 │   ├── character_bible.json         # Locked canonical character profiles
 │   ├── environment_bible.json       # Locked canonical environment profiles
+│   ├── script_bible.json            # Locked audio screenplay (dialogues, VO, narrator)
+│   ├── scene_bible.json             # Locked complete scenes with ComfyUI keyframes
 │   └── books/                       # Drag & drop your EPUB / TXT novels here
 │
 ├── docs/

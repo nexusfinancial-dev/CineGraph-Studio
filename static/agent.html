@@ -138,8 +138,8 @@
           <span class="text-[10px] font-mono text-amber-400 font-bold uppercase">{{ targetType }}</span>
         </div>
 
-        <!-- Target Type Toggle: Characters vs Voiceprints vs Environments vs Script -->
-        <div class="grid grid-cols-4 gap-1">
+        <!-- Target Type Toggle: Characters vs Voiceprints vs Environments vs Script vs Scenes -->
+        <div class="grid grid-cols-5 gap-1">
           <button @click="targetType = 'character'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'character' ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
             <span>👤 Chars</span>
           </button>
@@ -151,6 +151,9 @@
           </button>
           <button @click="targetType = 'script'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'script' ? 'bg-sky-500/20 border-sky-500 text-sky-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
             <span>💬 Script</span>
+          </button>
+          <button @click="targetType = 'scenes'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'scenes' ? 'bg-rose-500/20 border-rose-500 text-rose-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+            <span>🎬 Scenes</span>
           </button>
         </div>
 
@@ -222,6 +225,20 @@
           </p>
         </div>
 
+        <!-- Complete Scenes Scope Details -->
+        <div v-else-if="targetType === 'scenes'" class="flex flex-col gap-2">
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-[11px] text-gray-400">
+              <span class="font-medium">Target Scenes Count:</span>
+              <span class="font-bold text-rose-400 font-mono">{{ sceneCountTarget }} Scenes</span>
+            </div>
+            <input type="range" v-model.number="sceneCountTarget" min="3" max="25" step="1" class="w-full accent-rose-500 bg-gray-800 rounded-lg cursor-pointer" />
+          </div>
+          <p class="text-[10px] text-rose-300/80 italic">
+            Segments manuscript into full Hollywood scene sequences with sluglines, active cast, action beats, dialogue flows, soundscapes, and 24mm ComfyUI keyframes.
+          </p>
+        </div>
+
         <div class="p-2.5 rounded-lg bg-gray-900/40 border border-gray-800 text-[11px] text-gray-400 flex flex-col gap-1">
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" v-model="autoCanonMode" class="rounded border-gray-700 text-amber-500 focus:ring-0">
@@ -232,10 +249,10 @@
       </div>
 
       <!-- Run Action Button -->
-      <button @click="runProductionAgent" :disabled="isRunning || !selectedBook" :class="['w-full py-3.5 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg', isRunning ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : !selectedBook ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : targetType === 'character' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 glow-amber' : targetType === 'voiceprint' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white glow-purple' : targetType === 'script' ? 'bg-gradient-to-r from-sky-400 to-sky-600 hover:from-sky-300 hover:to-sky-500 text-gray-950 shadow-sky-900/50' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-gray-950 glow-emerald']">
+      <button @click="runProductionAgent" :disabled="isRunning || !selectedBook" :class="['w-full py-3.5 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg', isRunning ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : !selectedBook ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : targetType === 'character' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 glow-amber' : targetType === 'voiceprint' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white glow-purple' : targetType === 'script' ? 'bg-gradient-to-r from-sky-400 to-sky-600 hover:from-sky-300 hover:to-sky-500 text-gray-950 shadow-sky-900/50' : targetType === 'scenes' ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 text-white shadow-rose-900/50' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-gray-950 glow-emerald']">
         <span v-if="isRunning" class="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
         <span v-else>🚀</span>
-        <span>{{ isRunning ? 'Extracting via GraphRAG + LangGraph...' : (targetType === 'character' ? 'Extract & Lock Characters' : targetType === 'voiceprint' ? 'Extract & Lock Voiceprint' : targetType === 'script' ? 'Extract Dialogue, VO & Narrator' : 'Extract & Lock Environments') }}</span>
+        <span>{{ isRunning ? 'Extracting via GraphRAG + LangGraph...' : (targetType === 'character' ? 'Extract & Lock Characters' : targetType === 'voiceprint' ? 'Extract & Lock Voiceprint' : targetType === 'script' ? 'Extract Dialogue, VO & Narrator' : targetType === 'scenes' ? 'Extract & Lock Complete Scenes' : 'Extract & Lock Environments') }}</span>
       </button>
 
       <!-- Agent System Info -->
@@ -273,7 +290,12 @@
             <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-900/60 text-sky-300 font-mono">{{ (scriptData.dialogues?.length || 0) + (scriptData.voice_overs?.length || 0) + (scriptData.narrator_chunks?.length || 0) }}</span>
           </button>
 
-          <button @click="activeTab = 'conflicts'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'conflicts' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50' : 'text-gray-400 hover:text-white']">
+          <button @click="activeTab = 'scenes'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'scenes' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50' : 'text-gray-400 hover:text-white']">
+            <span>🎬 Complete Scenes</span>
+            <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-900/60 text-rose-300 font-mono">{{ lockedScenes.length }}</span>
+          </button>
+
+          <button @click="activeTab = 'conflicts'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'conflicts' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50' : 'text-gray-400 hover:text-white']">
             <span>⚖️ HITL Arbitration</span>
             <span v-if="pendingConflicts.length > 0" class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-600 text-white font-mono animate-bounce">{{ pendingConflicts.length }}</span>
           </button>
@@ -286,6 +308,8 @@
           <span class="text-emerald-400 font-bold">{{ lockedEnvironments.length }} Envs</span>
           <span class="text-gray-600">•</span>
           <span class="text-sky-400 font-bold">{{ (scriptData.dialogues?.length || 0) + (scriptData.voice_overs?.length || 0) + (scriptData.narrator_chunks?.length || 0) }} Lines</span>
+          <span class="text-gray-600">•</span>
+          <span class="text-rose-400 font-bold">{{ lockedScenes.length }} Scenes</span>
         </div>
       </div>
 
@@ -672,6 +696,141 @@
 
       </div>
 
+      <!-- TAB 5: COMPLETE SCENES & CINEMATIC KEYFRAMES -->
+      <div v-show="activeTab === 'scenes'" class="flex-1 p-4 overflow-y-auto flex flex-col gap-4">
+        
+        <!-- Header Bar -->
+        <div class="flex items-center justify-between bg-[#0c121e] border border-gray-800 p-3 rounded-2xl flex-shrink-0 flex-wrap gap-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-gray-300">🎬 Production Scenes Breakdown:</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-rose-950/80 text-rose-300 border border-rose-800/60">
+              {{ lockedScenes.length }} Full Scenes
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button @click="exportScenesJson" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 transition flex items-center gap-1.5">
+              <span>💾 Export Complete Screenplay JSON</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Zero State Placeholder -->
+        <div v-if="lockedScenes.length === 0" class="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-gray-800/80 rounded-2xl">
+          <span class="text-4xl mb-2">🎬</span>
+          <h3 class="text-sm font-bold text-gray-300">No Complete Scenes Extracted Yet</h3>
+          <p class="text-xs text-gray-500 mt-1 max-w-sm">Select 'Scenes' under Extraction Target on the left and run the agent to extract full Hollywood scene breakdowns with sluglines, cast blocking, dialogue flow, and ComfyUI keyframes.</p>
+        </div>
+
+        <!-- Scenes List -->
+        <div v-else class="space-y-4">
+          <div v-for="sc in lockedScenes" :key="sc.id" class="rounded-2xl bg-[#0c121e] border border-gray-800 p-5 flex flex-col gap-4 shadow-xl hover:border-gray-700 transition">
+            
+            <!-- Slate Header: Slugline, Time, Location -->
+            <div class="flex items-start justify-between border-b border-gray-800/80 pb-3 flex-wrap gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-black text-xs font-mono shadow">
+                  SCENE #{{ sc.scene_number }}
+                </span>
+                <span class="font-mono-code font-bold text-sm text-gray-100 tracking-wide">
+                  {{ sc.slugline }}
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-gray-900 border border-gray-700 text-amber-300">
+                  ☀️ {{ sc.time_of_day }}
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-gray-900 border border-gray-700 text-gray-400">
+                  📍 {{ sc.location_name }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Cast on Screen -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-bold text-gray-400">Active Cast:</span>
+              <span v-for="ch in sc.characters_present" :key="ch" :class="['px-2.5 py-0.5 rounded-full text-xs font-bold border font-mono', getSpeakerBadgeClass(ch)]">
+                👤 {{ ch }}
+              </span>
+            </div>
+
+            <!-- Dramatic Objective & Synopsis -->
+            <div class="p-3.5 rounded-xl bg-gray-950/70 border border-gray-800/80 flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Dramatic Objective:</span>
+                <span class="text-xs text-gray-200 font-medium">{{ sc.dramatic_objective }}</span>
+              </div>
+              <div class="text-xs text-gray-300 leading-relaxed">
+                <strong class="text-gray-400">Scene Synopsis:</strong> {{ sc.synopsis_en }}
+              </div>
+            </div>
+
+            <!-- Action Beats & Actor Blocking -->
+            <div v-if="sc.action_beats && sc.action_beats.length" class="flex flex-col gap-1.5">
+              <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Action Beats & Blocking:</span>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-300 font-medium">
+                <div v-for="(beat, bIdx) in sc.action_beats" :key="bIdx" class="p-2.5 rounded-lg bg-gray-900/50 border border-gray-800/60 flex items-start gap-2">
+                  <span class="w-5 h-5 rounded-full bg-gray-800 text-amber-400 flex items-center justify-center text-[10px] font-mono flex-shrink-0 font-bold">{{ bIdx + 1 }}</span>
+                  <span class="text-gray-200 leading-relaxed">{{ beat }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Audio & Dialogue Flow in Scene -->
+            <div v-if="sc.dialogue_flow && sc.dialogue_flow.length" class="flex flex-col gap-2">
+              <span class="text-[11px] font-bold text-sky-400 uppercase tracking-wider">Dialogue & Voice-Over Sequence:</span>
+              <div class="p-3 rounded-xl bg-gray-950/80 border border-gray-800 space-y-2 max-h-48 overflow-y-auto">
+                <div v-for="(d, dIdx) in sc.dialogue_flow" :key="dIdx" class="text-xs flex flex-col gap-0.5 border-b border-gray-900 pb-1.5 last:border-0">
+                  <div class="flex items-center justify-between">
+                    <span :class="['font-bold text-[11px] font-mono', d.type === 'voice_over' ? 'text-purple-400' : 'text-amber-300']">
+                      {{ d.speaker }} {{ d.type === 'voice_over' ? '(V.O.)' : '' }}:
+                    </span>
+                    <button @click="copyPrompt(d.performance_instruction + ' ' + d.line_en)" class="text-[10px] text-sky-400 hover:text-sky-300">Copy Line</button>
+                  </div>
+                  <p class="text-gray-100 font-semibold italic">"{{ d.line_en }}"</p>
+                  <span class="text-[10px] text-gray-400 font-mono">{{ d.performance_instruction }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Soundscape & Foley Ambience -->
+            <div class="p-2.5 rounded-lg bg-indigo-950/20 border border-indigo-800/40 text-xs text-indigo-200 flex items-center gap-2">
+              <span class="text-base flex-shrink-0">🎧</span>
+              <div>
+                <strong class="text-indigo-300">Soundscape & Foley:</strong> {{ sc.soundscape_and_foley }}
+              </div>
+            </div>
+
+            <!-- Compiled Keyframe Generation Prompts (ComfyUI / Flux Ready) -->
+            <div v-if="sc.keyframes && sc.keyframes.length" class="flex flex-col gap-2">
+              <span class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Compiled Visual Keyframes (ComfyUI / Flux):</span>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div v-for="(kf, kfIdx) in sc.keyframes" :key="kfIdx" class="p-3 rounded-xl bg-gray-950/90 border border-gray-800 flex flex-col justify-between gap-2.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-emerald-300 font-mono">Shot {{ kfIdx + 1 }}: {{ kf.shot_type }}</span>
+                    <button @click="copyPrompt(kf.visual_prompt)" class="px-2 py-0.5 rounded bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 text-[10px] font-mono font-semibold transition">
+                      📋 Copy Prompt
+                    </button>
+                  </div>
+                  <p class="text-[11px] text-gray-400 font-mono italic bg-black/50 p-2 rounded-lg border border-gray-800/80 line-clamp-3">
+                    "{{ kf.visual_prompt }}"
+                  </p>
+                  <span class="text-[10px] text-gray-400">Angle: {{ kf.camera_angle }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Verbatim Novel Verification Accordion -->
+            <details v-if="sc.raw_novel_excerpt" class="text-[11px] text-gray-400 bg-gray-900/40 rounded-lg p-2 border border-gray-800/60">
+              <summary class="cursor-pointer font-semibold text-gray-500 hover:text-gray-300">📖 Verbatim Novel Scene Evidence</summary>
+              <p class="mt-1.5 italic text-gray-300">"{{ sc.raw_novel_excerpt }}"</p>
+            </details>
+
+          </div>
+        </div>
+
+      </div>
+
     </main>
 
   </div>
@@ -764,6 +923,8 @@ createApp({
     const lockedCharacters = ref([]);
     const lockedEnvironments = ref([]);
     const pendingConflicts = ref([]);
+    const lockedScenes = ref([]);
+    const sceneCountTarget = ref(12);
 
     const onBookSelected = () => {
       selectedBookInfo.value = books.value.find(b => b.id === selectedBook.value) || null;
@@ -878,6 +1039,30 @@ createApp({
       }
     };
 
+    const exportScenesJson = () => {
+      const payload = {
+        novel_title: selectedBookInfo.value ? selectedBookInfo.value.title : selectedBook.value,
+        scenes: lockedScenes.value
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `complete_scenes_${selectedBook.value}.json`;
+      a.click();
+      addLog("[Export] Complete production scenes exported to JSON!");
+    };
+
+    const fetchLockedScenes = async () => {
+      try {
+        const res = await fetch('/api/agent/scenes');
+        const data = await res.json();
+        if (data && data.scenes) lockedScenes.value = data.scenes;
+      } catch (e) {
+        console.log("Scenes fetch error:", e);
+      }
+    };
+
     const executeStudioReset = async () => {
       try {
         const res = await fetch('/api/agent/reset', { method: 'POST' });
@@ -885,6 +1070,7 @@ createApp({
         lockedCharacters.value = [];
         lockedEnvironments.value = [];
         pendingConflicts.value = [];
+        lockedScenes.value = [];
         scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
         pipelineSteps.value.forEach(s => s.status = 'ready');
         addLog("[StudioReset] Databases successfully zeroed out. Studio is clean.");
@@ -894,6 +1080,7 @@ createApp({
         lockedCharacters.value = [];
         lockedEnvironments.value = [];
         pendingConflicts.value = [];
+        lockedScenes.value = [];
         scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
         addLog("[StudioReset] Local reset completed. Ready for fresh novel.");
         closeResetModal();
@@ -905,7 +1092,7 @@ createApp({
       activeTab.value = 'pipeline';
       pipelineSteps.value.forEach(s => s.status = 'ready');
 
-      const domainName = targetType.value === 'character' ? 'Characters' : targetType.value === 'voiceprint' ? 'Voiceprints' : targetType.value === 'script' ? 'Dialogue & Audio Script' : 'Environments';
+      const domainName = targetType.value === 'character' ? 'Characters' : targetType.value === 'voiceprint' ? 'Voiceprints' : targetType.value === 'script' ? 'Dialogue & Audio Script' : targetType.value === 'scenes' ? 'Complete Scenes' : 'Environments';
       addLog(`[Agent] Initiating GraphRAG + LangGraph Pipeline for ${domainName}: ${selectedBookInfo.value ? selectedBookInfo.value.title : selectedBook.value}`);
       
       // Step 1: Ingestion
@@ -969,6 +1156,20 @@ createApp({
           if (data.logs) data.logs.forEach(l => addLog(l));
           addLog(`[PipelineComplete] Audio script extracted (${scriptScope.value}) in original English!`);
           activeTab.value = 'script';
+        } else if (targetType.value === 'scenes') {
+          const res = await fetch('/api/agent/run_scenes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              book_id: selectedBook.value,
+              scene_count: parseInt(sceneCountTarget.value) || 12
+            })
+          });
+          const data = await res.json();
+          if (data.scenes) lockedScenes.value = data.scenes;
+          if (data.logs) data.logs.forEach(l => addLog(l));
+          addLog(`[PipelineComplete] ${lockedScenes.value.length} Complete Hollywood Production Scenes locked!`);
+          activeTab.value = 'scenes';
         } else {
           const locParam = envExecutionMode.value === 'single' ? targetLocationName.value : 'Meteoropolis Reincarnation Laboratories';
           const res = await fetch('/api/agent/run_environment', {
@@ -993,6 +1194,8 @@ createApp({
           activeTab.value = 'bible';
         } else if (targetType.value === 'script') {
           activeTab.value = 'script';
+        } else if (targetType.value === 'scenes') {
+          activeTab.value = 'scenes';
         } else {
           activeTab.value = 'environments';
         }
@@ -1005,6 +1208,7 @@ createApp({
         fetchLockedCharacters();
         fetchLockedEnvironments();
         fetchScriptData();
+        fetchLockedScenes();
       } finally {
         isRunning.value = false;
       }
@@ -1070,6 +1274,7 @@ createApp({
       fetchLockedCharacters();
       fetchLockedEnvironments();
       fetchScriptData();
+      fetchLockedScenes();
     });
 
     return {
@@ -1078,6 +1283,7 @@ createApp({
       envExecutionMode, targetLocationName,
       scriptScope, scriptCharacter, scriptFilter, scriptData, filteredScriptItems,
       getSpeakerBadgeClass, exportScriptJson, fetchScriptData,
+      lockedScenes, sceneCountTarget, exportScenesJson, fetchLockedScenes,
       autoCanonMode, books, selectedBook, selectedBookInfo, onBookSelected,
       pipelineSteps, logs, logContainer, clearLogs, getLogColor, getStepClass, getStepIcon,
       lockedCharacters, lockedEnvironments, pendingConflicts, openResetModal, closeResetModal,
