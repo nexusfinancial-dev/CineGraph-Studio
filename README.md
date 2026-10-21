@@ -126,8 +126,8 @@ CineGraph Studio AI features a dedicated, zero-latency director dashboard served
 
 ### 1. Clone & Install
 ```bash
-git clone https://github.com/your-username/cinegraph-studio-ai.git
-cd cinegraph-studio-ai
+git clone https://github.com/nexusfinancial-dev/CineGraph-Studio.git
+cd CineGraph-Studio
 pip install -r requirements.txt
 ```
 
@@ -177,7 +177,9 @@ python micro_scene_production_graph.py
 
 ```
 cinegraph-studio-ai/
-├── server.py                        # FastAPI backend & Studio API endpoints
+├── server.py                        # FastAPI backend & ComfyUI automation endpoints
+├── comfy_studio_engine.py           # Headless ComfyUI execution & polling runner
+├── workflows/                       # Production ComfyUI workflow graphs (Qwen3, Krea2, MiniMax H3)
 ├── novel_production_graph.py        # LangGraph Character StateGraph & HITL engine
 ├── environment_production_graph.py  # LangGraph Environment & Matte Plate engine
 ├── voiceprint_production.py         # 5D Voice Design & English dialogue extractor
@@ -190,7 +192,7 @@ cinegraph-studio-ai/
 ├── .env.example                     # Environment configuration template
 │
 ├── static/
-│   ├── agent.html                   # Cinematic Director Studio Web Interface
+│   ├── agent.html                   # Cinematic Director Studio Web Interface (with ComfyUI live rendering)
 │   └── index.html                   # Asset Bible reader
 │
 ├── data/
