@@ -138,16 +138,19 @@
           <span class="text-[10px] font-mono text-amber-400 font-bold uppercase">{{ targetType }}</span>
         </div>
 
-        <!-- Target Type Toggle: Characters vs Voiceprints vs Environments -->
-        <div class="grid grid-cols-3 gap-1.5">
-          <button @click="targetType = 'character'" :class="['py-2 px-2 rounded-lg text-[11px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'character' ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
-            <span>👤 Characters</span>
+        <!-- Target Type Toggle: Characters vs Voiceprints vs Environments vs Script -->
+        <div class="grid grid-cols-4 gap-1">
+          <button @click="targetType = 'character'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'character' ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+            <span>👤 Chars</span>
           </button>
-          <button @click="targetType = 'voiceprint'" :class="['py-2 px-2 rounded-lg text-[11px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'voiceprint' ? 'bg-purple-500/20 border-purple-500 text-purple-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
-            <span>🎙️ Voiceprints</span>
+          <button @click="targetType = 'voiceprint'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'voiceprint' ? 'bg-purple-500/20 border-purple-500 text-purple-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+            <span>🎙️ Voices</span>
           </button>
-          <button @click="targetType = 'environment'" :class="['py-2 px-2 rounded-lg text-[11px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'environment' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
-            <span>🏞️ Environments</span>
+          <button @click="targetType = 'environment'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'environment' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+            <span>🏞️ Envs</span>
+          </button>
+          <button @click="targetType = 'script'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'script' ? 'bg-sky-500/20 border-sky-500 text-sky-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+            <span>💬 Script</span>
           </button>
         </div>
 
@@ -179,7 +182,7 @@
         </div>
 
         <!-- Environment Scope Details -->
-        <div v-else class="flex flex-col gap-2">
+        <div v-else-if="targetType === 'environment'" class="flex flex-col gap-2">
           <div class="grid grid-cols-2 gap-2">
             <button @click="envExecutionMode = 'primary'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold border transition text-center', envExecutionMode === 'primary' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
               🌐 Key Locations
@@ -194,6 +197,31 @@
           </div>
         </div>
 
+        <!-- Script & Dialogue Scope Details -->
+        <div v-else-if="targetType === 'script'" class="flex flex-col gap-2">
+          <div class="grid grid-cols-2 gap-1.5">
+            <button @click="scriptScope = 'all'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold border transition text-center', scriptScope === 'all' ? 'bg-sky-500/20 border-sky-500 text-sky-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+              🎭 All Elements
+            </button>
+            <button @click="scriptScope = 'dialogue'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold border transition text-center', scriptScope === 'dialogue' ? 'bg-sky-500/20 border-sky-500 text-sky-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+              🗣️ Spoken Only
+            </button>
+            <button @click="scriptScope = 'voiceover'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold border transition text-center', scriptScope === 'voiceover' ? 'bg-sky-500/20 border-sky-500 text-sky-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+              🧠 Voice-Over
+            </button>
+            <button @click="scriptScope = 'narrator'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold border transition text-center', scriptScope === 'narrator' ? 'bg-sky-500/20 border-sky-500 text-sky-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+              🎙️ Narrator
+            </button>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] text-gray-400 font-medium">Character Focus (Optional):</label>
+            <input v-model="scriptCharacter" placeholder="e.g. Mamba, Blossom, or leave blank for scene..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 transition font-medium" />
+          </div>
+          <p class="text-[10px] text-gray-400 italic">
+            Extracts verbatim spoken dialogues in original English, inner monologue VO, and cinematic narrator exposition with [Instruction:] performance directives.
+          </p>
+        </div>
+
         <div class="p-2.5 rounded-lg bg-gray-900/40 border border-gray-800 text-[11px] text-gray-400 flex flex-col gap-1">
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" v-model="autoCanonMode" class="rounded border-gray-700 text-amber-500 focus:ring-0">
@@ -204,10 +232,10 @@
       </div>
 
       <!-- Run Action Button -->
-      <button @click="runProductionAgent" :disabled="isRunning || !selectedBook" :class="['w-full py-3.5 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg', isRunning ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : !selectedBook ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : targetType === 'character' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 glow-amber' : targetType === 'voiceprint' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white glow-purple' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-gray-950 glow-emerald']">
+      <button @click="runProductionAgent" :disabled="isRunning || !selectedBook" :class="['w-full py-3.5 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg', isRunning ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : !selectedBook ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : targetType === 'character' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 glow-amber' : targetType === 'voiceprint' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white glow-purple' : targetType === 'script' ? 'bg-gradient-to-r from-sky-400 to-sky-600 hover:from-sky-300 hover:to-sky-500 text-gray-950 shadow-sky-900/50' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-gray-950 glow-emerald']">
         <span v-if="isRunning" class="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
         <span v-else>🚀</span>
-        <span>{{ isRunning ? 'Extracting via GraphRAG + LangGraph...' : (targetType === 'character' ? 'Extract & Lock Characters' : targetType === 'voiceprint' ? 'Extract & Lock Voiceprint' : 'Extract & Lock Environments') }}</span>
+        <span>{{ isRunning ? 'Extracting via GraphRAG + LangGraph...' : (targetType === 'character' ? 'Extract & Lock Characters' : targetType === 'voiceprint' ? 'Extract & Lock Voiceprint' : targetType === 'script' ? 'Extract Dialogue, VO & Narrator' : 'Extract & Lock Environments') }}</span>
       </button>
 
       <!-- Agent System Info -->
@@ -240,17 +268,24 @@
             <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-900/60 text-emerald-300 font-mono">{{ lockedEnvironments.length }}</span>
           </button>
 
+          <button @click="activeTab = 'script'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'script' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/50' : 'text-gray-400 hover:text-white']">
+            <span>💬 Audio Script & Narration</span>
+            <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-900/60 text-sky-300 font-mono">{{ (scriptData.dialogues?.length || 0) + (scriptData.voice_overs?.length || 0) + (scriptData.narrator_chunks?.length || 0) }}</span>
+          </button>
+
           <button @click="activeTab = 'conflicts'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'conflicts' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50' : 'text-gray-400 hover:text-white']">
             <span>⚖️ HITL Arbitration</span>
             <span v-if="pendingConflicts.length > 0" class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-600 text-white font-mono animate-bounce">{{ pendingConflicts.length }}</span>
           </button>
         </div>
 
-        <div class="text-[11px] text-gray-500 font-mono">
-          <span>Locked Assets: </span>
+        <div class="text-[11px] text-gray-500 font-mono flex items-center gap-1.5">
+          <span>Locked: </span>
           <span class="text-amber-400 font-bold">{{ lockedCharacters.length }} Chars</span>
-          <span class="text-gray-600 mx-1">•</span>
+          <span class="text-gray-600">•</span>
           <span class="text-emerald-400 font-bold">{{ lockedEnvironments.length }} Envs</span>
+          <span class="text-gray-600">•</span>
+          <span class="text-sky-400 font-bold">{{ (scriptData.dialogues?.length || 0) + (scriptData.voice_overs?.length || 0) + (scriptData.narrator_chunks?.length || 0) }} Lines</span>
         </div>
       </div>
 
@@ -524,6 +559,119 @@
         </div>
       </div>
 
+      <!-- TAB 4: AUDIO SCRIPT (DIALOGUES, VO & NARRATOR) -->
+      <div v-show="activeTab === 'script'" class="flex-1 p-4 overflow-y-auto flex flex-col gap-4">
+        
+        <!-- Header Bar with Filter Tabs -->
+        <div class="flex items-center justify-between bg-[#0c121e] border border-gray-800 p-3 rounded-2xl flex-shrink-0 flex-wrap gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-bold text-gray-400 mr-1">Filter View:</span>
+            <button @click="scriptFilter = 'all'" :class="['px-3 py-1 rounded-lg text-xs font-bold transition', scriptFilter === 'all' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/50' : 'bg-gray-900/60 text-gray-400 hover:text-white']">
+              All ({{ (scriptData.dialogues?.length || 0) + (scriptData.voice_overs?.length || 0) + (scriptData.narrator_chunks?.length || 0) }})
+            </button>
+            <button @click="scriptFilter = 'dialogue'" :class="['px-3 py-1 rounded-lg text-xs font-bold transition', scriptFilter === 'dialogue' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' : 'bg-gray-900/60 text-gray-400 hover:text-white']">
+              🗣️ Spoken Dialogue ({{ scriptData.dialogues?.length || 0 }})
+            </button>
+            <button @click="scriptFilter = 'voiceover'" :class="['px-3 py-1 rounded-lg text-xs font-bold transition', scriptFilter === 'voiceover' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50' : 'bg-gray-900/60 text-gray-400 hover:text-white']">
+              🧠 Voice-Over V.O. ({{ scriptData.voice_overs?.length || 0 }})
+            </button>
+            <button @click="scriptFilter = 'narrator'" :class="['px-3 py-1 rounded-lg text-xs font-bold transition', scriptFilter === 'narrator' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50' : 'bg-gray-900/60 text-gray-400 hover:text-white']">
+              🎙️ Narrator Exposition ({{ scriptData.narrator_chunks?.length || 0 }})
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button @click="exportScriptJson" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 transition flex items-center gap-1.5">
+              <span>💾 Export Screenplay JSON</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Narrator Voice Profile Card (Qwen3-TTS / CosyVoice) -->
+        <div v-if="scriptData.narrator_voiceprint" class="p-4 rounded-2xl bg-gradient-to-r from-amber-950/20 via-gray-900/60 to-gray-900 border border-amber-700/40 shadow-lg flex flex-col gap-2.5 flex-shrink-0">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+              <span>🎙️ Narrator Voice Profile (Qwen3-TTS / CosyVoice Universal Formula)</span>
+            </span>
+            <button @click="copyPrompt(scriptData.narrator_voiceprint.voiceprint_prompt)" class="px-2.5 py-1 rounded-lg bg-amber-900/50 hover:bg-amber-800 text-amber-200 text-[11px] font-mono font-semibold transition">
+              📋 Copy Narrator Voiceprint
+            </button>
+          </div>
+          <p class="text-xs text-gray-300 font-mono italic bg-black/40 p-2.5 rounded-xl border border-amber-900/40">
+            "{{ scriptData.narrator_voiceprint.voiceprint_prompt }}"
+          </p>
+          <div class="grid grid-cols-3 gap-2 text-[11px] text-gray-400">
+            <div><span class="text-gray-500">Timbre:</span> <span class="text-amber-200">{{ scriptData.narrator_voiceprint.timbre }}</span></div>
+            <div><span class="text-gray-500">Cadence:</span> <span class="text-amber-200">{{ scriptData.narrator_voiceprint.cadence }}</span></div>
+            <div><span class="text-gray-500">Acoustics:</span> <span class="text-amber-200">{{ scriptData.narrator_voiceprint.acoustics }}</span></div>
+          </div>
+        </div>
+
+        <!-- Zero State Placeholder -->
+        <div v-if="filteredScriptItems.length === 0" class="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-gray-800/80 rounded-2xl">
+          <span class="text-4xl mb-2">💬</span>
+          <h3 class="text-sm font-bold text-gray-300">No Script Lines Extracted Yet</h3>
+          <p class="text-xs text-gray-500 mt-1 max-w-sm">Select 'Script' under Extraction Target on the left and run the agent to extract dialogues, voice-overs, and narrator exposition in original English.</p>
+        </div>
+
+        <!-- Script Cards Grid -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div v-for="item in filteredScriptItems" :key="item.id" class="rounded-2xl bg-[#0c121e] border border-gray-800 p-4 flex flex-col gap-3 shadow-lg hover:border-gray-700 transition">
+            
+            <!-- Card Header: Badges & Category -->
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-2 flex-wrap">
+                <!-- Category Pill -->
+                <span v-if="item.category === 'dialogue'" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700/60 text-emerald-300 font-bold">🗣️ Spoken Dialogue</span>
+                <span v-else-if="item.category === 'voiceover'" class="text-[10px] px-2 py-0.5 rounded-full bg-purple-950 border border-purple-700/60 text-purple-300 font-bold">🧠 Voice-Over (V.O.)</span>
+                <span v-else class="text-[10px] px-2 py-0.5 rounded-full bg-amber-950 border border-amber-700/60 text-amber-300 font-bold">🎙️ Narrator</span>
+
+                <!-- Speaker Badge -->
+                <span :class="['text-xs font-bold px-2 py-0.5 rounded-md font-mono', getSpeakerBadgeClass(item.speaker)]">
+                  {{ item.speaker }}
+                </span>
+
+                <!-- Addressee Badge (For Dialogues) -->
+                <span v-if="item.addressed_to" class="text-[10px] text-gray-400">
+                  🗣️ to <strong class="text-gray-300">{{ item.addressed_to }}</strong>
+                </span>
+
+                <!-- Emotion Badge -->
+                <span v-if="item.emotion" class="text-[10px] px-2 py-0.5 rounded bg-gray-900 border border-gray-700 text-gray-300 font-medium">
+                  {{ item.emotion }}
+                </span>
+              </div>
+
+              <span class="text-[10px] font-mono text-gray-500">{{ item.id }}</span>
+            </div>
+
+            <!-- Main Original English Spoken Line / Monologue -->
+            <div class="p-3 rounded-xl bg-gray-950/80 border border-gray-800/80 text-sm font-semibold text-white leading-relaxed">
+              "{{ item.line_en }}"
+            </div>
+
+            <!-- Acting / TTS Performance Directives -->
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                <span class="flex items-center gap-1">🎙️ Performance Directive (Qwen3-TTS / CosyVoice):</span>
+                <button @click="copyPrompt(item.performance_instruction + ' ' + item.line_en)" class="text-sky-400 hover:text-sky-300 font-semibold">Copy Line + Tag</button>
+              </div>
+              <div class="p-2 rounded-lg bg-sky-950/20 border border-sky-800/30 text-[11px] font-mono text-sky-200">
+                {{ item.performance_instruction }}
+              </div>
+            </div>
+
+            <!-- Verbatim Novel Proof Quote (Accordion) -->
+            <details v-if="item.context_quote" class="text-[11px] text-gray-400 bg-gray-900/40 rounded-lg p-2 border border-gray-800/60">
+              <summary class="cursor-pointer font-semibold text-gray-500 hover:text-gray-300">📖 Novel Verification Quote</summary>
+              <p class="mt-1.5 italic text-gray-300">"{{ item.context_quote }}"</p>
+            </details>
+
+          </div>
+        </div>
+
+      </div>
+
     </main>
 
   </div>
@@ -562,7 +710,7 @@
 </div>
 
 <script>
-const { createApp, ref, onMounted, nextTick } = Vue;
+const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
 createApp({
   setup() {
@@ -571,7 +719,7 @@ createApp({
     const activeTab = ref('pipeline');
     const isRunning = ref(false);
     
-    // Target Domain: 'character' vs 'environment'
+    // Target Domain: 'character' vs 'voiceprint' vs 'environment' vs 'script'
     const targetType = ref('character');
     
     // Character Scope
@@ -581,6 +729,12 @@ createApp({
     // Environment Scope
     const envExecutionMode = ref('primary');
     const targetLocationName = ref('');
+
+    // Script & Dialogue Scope
+    const scriptScope = ref('all');
+    const scriptCharacter = ref('');
+    const scriptFilter = ref('all');
+    const scriptData = ref({ dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null });
 
     const autoCanonMode = ref(true);
 
@@ -678,6 +832,52 @@ createApp({
       if (modal) modal.close();
     };
 
+    const filteredScriptItems = computed(() => {
+      const items = [];
+      const d = scriptData.value.dialogues || [];
+      const vo = scriptData.value.voice_overs || [];
+      const nar = scriptData.value.narrator_chunks || [];
+      if (scriptFilter.value === 'all' || scriptFilter.value === 'dialogue') {
+        d.forEach(item => items.push({ ...item, category: 'dialogue' }));
+      }
+      if (scriptFilter.value === 'all' || scriptFilter.value === 'voiceover') {
+        vo.forEach(item => items.push({ ...item, category: 'voiceover' }));
+      }
+      if (scriptFilter.value === 'all' || scriptFilter.value === 'narrator') {
+        nar.forEach(item => items.push({ ...item, category: 'narrator', speaker: item.narrator_profile }));
+      }
+      return items;
+    });
+
+    const getSpeakerBadgeClass = (spk) => {
+      const s = (spk || '').toLowerCase();
+      if (s.includes('mamba')) return 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60';
+      if (s.includes('blossom')) return 'bg-pink-950/80 text-pink-300 border border-pink-700/60';
+      if (s.includes('brock')) return 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
+      if (s.includes('doctor') || s.includes('councilman')) return 'bg-indigo-950/80 text-indigo-300 border border-indigo-700/60';
+      return 'bg-gray-800 text-gray-200 border border-gray-700';
+    };
+
+    const exportScriptJson = () => {
+      const blob = new Blob([JSON.stringify(scriptData.value, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `script_screenplay_${selectedBook.value}.json`;
+      a.click();
+      addLog("[Export] Audio script screenplay exported to JSON!");
+    };
+
+    const fetchScriptData = async () => {
+      try {
+        const res = await fetch('/api/agent/script');
+        const data = await res.json();
+        if (data) scriptData.value = data;
+      } catch (e) {
+        console.log("Script fetch error:", e);
+      }
+    };
+
     const executeStudioReset = async () => {
       try {
         const res = await fetch('/api/agent/reset', { method: 'POST' });
@@ -685,6 +885,7 @@ createApp({
         lockedCharacters.value = [];
         lockedEnvironments.value = [];
         pendingConflicts.value = [];
+        scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
         pipelineSteps.value.forEach(s => s.status = 'ready');
         addLog("[StudioReset] Databases successfully zeroed out. Studio is clean.");
         closeResetModal();
@@ -693,6 +894,7 @@ createApp({
         lockedCharacters.value = [];
         lockedEnvironments.value = [];
         pendingConflicts.value = [];
+        scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
         addLog("[StudioReset] Local reset completed. Ready for fresh novel.");
         closeResetModal();
       }
@@ -703,7 +905,7 @@ createApp({
       activeTab.value = 'pipeline';
       pipelineSteps.value.forEach(s => s.status = 'ready');
 
-      const domainName = targetType.value === 'character' ? 'Characters' : 'Environments';
+      const domainName = targetType.value === 'character' ? 'Characters' : targetType.value === 'voiceprint' ? 'Voiceprints' : targetType.value === 'script' ? 'Dialogue & Audio Script' : 'Environments';
       addLog(`[Agent] Initiating GraphRAG + LangGraph Pipeline for ${domainName}: ${selectedBookInfo.value ? selectedBookInfo.value.title : selectedBook.value}`);
       
       // Step 1: Ingestion
@@ -752,6 +954,21 @@ createApp({
           if (data.logs) data.logs.forEach(l => addLog(l));
           addLog(`[PipelineComplete] Voiceprint & original English dialogue lines locked for ${charParam}!`);
           activeTab.value = 'bible';
+        } else if (targetType.value === 'script') {
+          const res = await fetch('/api/agent/run_script', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              book_id: selectedBook.value,
+              scope: scriptScope.value,
+              character: scriptCharacter.value
+            })
+          });
+          const data = await res.json();
+          if (data.script) scriptData.value = data.script;
+          if (data.logs) data.logs.forEach(l => addLog(l));
+          addLog(`[PipelineComplete] Audio script extracted (${scriptScope.value}) in original English!`);
+          activeTab.value = 'script';
         } else {
           const locParam = envExecutionMode.value === 'single' ? targetLocationName.value : 'Meteoropolis Reincarnation Laboratories';
           const res = await fetch('/api/agent/run_environment', {
@@ -774,6 +991,8 @@ createApp({
 
         if (targetType.value === 'character' || targetType.value === 'voiceprint') {
           activeTab.value = 'bible';
+        } else if (targetType.value === 'script') {
+          activeTab.value = 'script';
         } else {
           activeTab.value = 'environments';
         }
@@ -785,6 +1004,7 @@ createApp({
         pipelineSteps.value[4].status = 'done';
         fetchLockedCharacters();
         fetchLockedEnvironments();
+        fetchScriptData();
       } finally {
         isRunning.value = false;
       }
@@ -849,12 +1069,15 @@ createApp({
       fetchBooks();
       fetchLockedCharacters();
       fetchLockedEnvironments();
+      fetchScriptData();
     });
 
     return {
       lmOnline, embedOnline, activeTab, isRunning,
       targetType, executionMode, targetCharacterName,
       envExecutionMode, targetLocationName,
+      scriptScope, scriptCharacter, scriptFilter, scriptData, filteredScriptItems,
+      getSpeakerBadgeClass, exportScriptJson, fetchScriptData,
       autoCanonMode, books, selectedBook, selectedBookInfo, onBookSelected,
       pipelineSteps, logs, logContainer, clearLogs, getLogColor, getStepClass, getStepIcon,
       lockedCharacters, lockedEnvironments, pendingConflicts, openResetModal, closeResetModal,

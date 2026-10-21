@@ -74,7 +74,13 @@ Generative AI video models (Runway, Kling, Sora, MiniMax H3) have unlocked hyper
 * **Verbatim English Dialogue Samples:** Extracts actual spoken lines in the novel's original English.
 * **Line-by-Line Performance Directives:** Prepends nuanced performance instructions (e.g., `[Instruction: Seductive whisper with slight vocal fry, dry close-mic studio recording, zero reverb]`).
 
-### 4. ⚖️ Human-in-the-Loop (HITL) Conflict Arbitration
+### 4. 💬 Dialogue, Voice-Over (V.O.) & Narrator Screenplay Extraction
+* **Spoken Dialogues:** Extracts character-to-character conversations aloud on screen, complete with speaker attribution, addressee tags, emotional subtext, and acting performance directives `[Instruction: ...]`. All preserved in original novel English.
+* **Cinematic Voice-Over (V.O.):** Isolates internal monologues, psychological reflections, and memories of the POV protagonist with intimate close-mic acoustic tags.
+* **Narrator Exposition:** Extracts establishing narrative prose describing sensory ambiance, lighting, and world transitions, matched with 24mm anamorphic cinematic camera beats and a dedicated Narrator Voice Profile.
+* **Screenplay JSON Export:** Exports complete audio screenplay bibles ready for batch voice generation or speech alignment.
+
+### 5. ⚖️ Human-in-the-Loop (HITL) Conflict Arbitration
 * When the manuscript contains contradictory descriptions (e.g., green-skinned nymph vs. human camouflage, or eye color variance under different lighting), the LangGraph engine halts execution and flags the discrepancy.
 * The director resolves the ambiguity via the interactive UI modal before the canonical bible is permanently locked.
 

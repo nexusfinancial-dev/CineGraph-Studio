@@ -3367,6 +3367,20 @@ def reset_agent_studio():
         with open(db_path, "w", encoding="utf-8") as f:
             json.dump({"characters": [], "scenes": [], "metadata": {"reset": True}}, f, indent=2)
 
+        script_path = os.path.join(DATA_DIR, "script_bible.json")
+        with open(script_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "dialogues": [],
+                "voice_overs": [],
+                "narrator_chunks": [],
+                "narrator_voiceprint": {
+                    "voiceprint_prompt": "A mature male cinematic narrator in his mid-40s with a deep, warm, resonant baritone. Measured, articulate, authoritative cadence with natural pauses between sentences. Calm, immersive storyteller demeanor. Rich studio microphone capture, zero room echo, warm low-end proximity.",
+                    "timbre": "Deep resonant baritone with rich vocal chest resonance",
+                    "cadence": "Measured cinematic rhythm, authoritative storytelling pace",
+                    "acoustics": "Ultra-clean broadcast booth, zero reverb, dry proximity"
+                }
+            }, f, indent=2)
+
         return {"status": "success", "message": "Studio reset to zero (Clean Canvas)"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -3543,6 +3557,65 @@ def run_environment_endpoint(req: EnvironmentRunRequest):
             "status": "error",
             "message": str(e),
             "environments": get_agent_environments().get("environments", [])
+        }
+
+@app.get("/api/agent/script")
+def get_agent_script():
+    """Retrieve all extracted dialogues, voice-overs, and narrator lines."""
+    import dialogue_production_graph
+    data = dialogue_production_graph.load_script_bible()
+    return data
+
+class ScriptRunRequest(BaseModel):
+    book_id: str
+    character: Optional[str] = ""
+    scope: Optional[str] = "all"  # all | dialogue | voiceover | narrator
+
+@app.post("/api/agent/run_script")
+def run_script_endpoint(req: ScriptRunRequest):
+    """Run GraphRAG + LangGraph Script Agent for novel dialogues, VO, and narrator."""
+    import uuid
+    import run_agent
+    import dialogue_production_graph
+    try:
+        book_input = "Solar Dragons Need Love Too 1" if "solar" in req.book_id.lower() else req.book_id
+        txt_path = run_agent.resolve_novel_text(book_input)
+        
+        target_char = req.character.strip() if req.character else None
+        scope = req.scope.strip().lower() if req.scope else "all"
+        
+        app_graph = dialogue_production_graph.build_script_pipeline_graph()
+        initial_state = {
+            "novel_text_path": txt_path,
+            "scope_filter": scope,
+            "target_character": target_char,
+            "target_scene": None,
+            "raw_passages": [],
+            "extracted_script": None,
+            "is_locked": False
+        }
+        config = {"configurable": {"thread_id": f"script_run_{uuid.uuid4().hex[:6]}"}}
+        app_graph.invoke(initial_state, config=config)
+        
+        script_res = dialogue_production_graph.load_script_bible()
+        return {
+            "status": "success",
+            "message": f"Successfully extracted script ({scope})",
+            "script": script_res,
+            "logs": [
+                f"[Script Agent] Ingested text from: {os.path.basename(txt_path)}",
+                f"[Dialogues] Extracted {len(script_res.get('dialogues', []))} character exchanges in original English",
+                f"[Voice-Over] Extracted {len(script_res.get('voice_overs', []))} internal monologues with [Instruction:] tags",
+                f"[Narrator] Extracted {len(script_res.get('narrator_chunks', []))} cinematic exposition chunks",
+                f"[Audio Locked] Saved to data/script_bible.json"
+            ]
+        }
+    except Exception as e:
+        import dialogue_production_graph
+        return {
+            "status": "error",
+            "message": str(e),
+            "script": dialogue_production_graph.load_script_bible()
         }
 
 
