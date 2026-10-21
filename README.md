@@ -39,19 +39,19 @@ Generative AI video models (Runway, Kling, Sora, MiniMax H3) have unlocked hyper
    │  └───────────────────────┘   └────────────────────────┘ │
    └───────────────────────────┬─────────────────────────────┘
                                │
-            ┌──────────────────┼──────────────────┬──────────────────┐
-            ▼                  ▼                  ▼                  ▼
-   ┌─────────────────┐┌─────────────────┐┌─────────────────┐┌─────────────────┐
-   │ Character Bible ││Environment Bible││Audio Screenplay ││ Complete Scenes │
-   │  (#FFFFFF Void  ││ (24mm Anamorphic││(Dialogues / V.O.││ (Sluglines, 4-  │
-   │ Portrait Prompt)││  Matte Plates)  ││ & Narrator)     ││ Beats & Frames) │
-   └────────┬────────┘└────────┬────────┘└────────┬────────┘└────────┬────────┘
-            │                  │                  │                  │
-            ▼                  ▼                  ▼                  ▼
-   ┌─────────────────┐┌─────────────────┐┌─────────────────┐┌─────────────────┐
-   │ ComfyUI / Flux  ││ ComfyUI / Krea  ││ Qwen3-TTS /     ││ ComfyUI Keyframe│
-   │ InstantID / IP  ││ Matte Plate Gen ││ CosyVoice TTS   ││ Sequencing      │
-   └─────────────────┘└─────────────────┘└─────────────────┘└─────────────────┘
+            ┌──────────────────┼──────────────────┬──────────────────┬──────────────────┐
+            ▼                  ▼                  ▼                  ▼                  ▼
+   ┌─────────────────┐┌─────────────────┐┌─────────────────┐┌─────────────────┐┌─────────────────┐
+   │ Character Bible ││Environment Bible││Audio Screenplay ││ Complete Scenes ││ Micro-Scenes    │
+   │  (#FFFFFF Void  ││ (24mm Anamorphic││(Dialogues / V.O.││ (Sluglines, 4-  ││ (6s - 15s Takes│
+   │ Portrait Prompt)││  Matte Plates)  ││ & Narrator)     ││ Beats & Frames) ││ @ 2 words/sec)  │
+   └────────┬────────┘└────────┬────────┘└────────┬────────┘└────────┬────────┘└────────┬────────┘
+            │                  │                  │                  │                  │
+            ▼                  ▼                  ▼                  ▼                  ▼
+   ┌─────────────────┐┌─────────────────┐┌─────────────────┐┌─────────────────┐┌─────────────────┐
+   │ ComfyUI / Flux  ││ ComfyUI / Krea  ││ Qwen3-TTS /     ││ ComfyUI Keyframe││ MiniMax H3 /    │
+   │ InstantID / IP  ││ Matte Plate Gen ││ CosyVoice TTS   ││ Sequencing      ││ Kling 1.5 Video │
+   └─────────────────┘└─────────────────┘└─────────────────┘└─────────────────┘└─────────────────┘
 ```
 
 ---
@@ -90,7 +90,14 @@ Generative AI video models (Runway, Kling, Sora, MiniMax H3) have unlocked hyper
 * **Compiled ComfyUI / Flux Cinematic Prompts:** Pre-compiles dual shot keyframes (24mm anamorphic wide establishing + 50mm medium dramatic) with aspect ratio, film grain, and camera angle tags ready for one-click generation.
 * **Verbatim Novel Scene Evidence:** Stores unaltered excerpt citations to prove canonical narrative truth.
 
-### 6. ⚖️ Human-in-the-Loop (HITL) Conflict Arbitration
+### 6. ⏱️ Micro-Scenes & Takes Breakdown (6s – 15s AI Video Generative Standard)
+* **Strict Generative Windows (6.0s – 15.0s):** Decomposes every master scene into sequential generative video takes, perfectly matching the video duration limits of modern AI video models (MiniMax H3, Kling 1.5, Runway Gen-3, Wan 2.1, Luma Dream Machine, Sora).
+* **Calibrated Speech Pacing (2.0 words / second):** Every spoken dialogue or V.O. line is timed with strict Hollywood cadence ($T_{\text{speech}} = \text{words} / 2.0$), flanked by dramatic breathing and physical reaction buffers.
+* **Camera Framing & Lens Sequencing:** Alternates cinematic coverage across takes (Establishing Wide 24mm, Over-the-Shoulder 50mm, Medium Close-Up 50mm, Dramatic Telephoto 85mm, Low-Angle Power Shot).
+* **AI Video Generation Prompts:** Synthesizes dedicated camera motion vectors, subject blocking, lighting atmosphere, and consistency tokens for each individual take.
+* **Audio & Visual Timeline Visualization:** Visual breakdown bars displaying spoken audio duration vs. dramatic action buffer duration per take.
+
+### 7. ⚖️ Human-in-the-Loop (HITL) Conflict Arbitration
 * When the manuscript contains contradictory descriptions (e.g., green-skinned nymph vs. human camouflage, or eye color variance under different lighting), the LangGraph engine halts execution and flags the discrepancy.
 * The director resolves the ambiguity via the interactive UI modal before the canonical bible is permanently locked.
 
@@ -105,6 +112,7 @@ CineGraph Studio AI features a dedicated, zero-latency director dashboard served
 * **Environment Bible View:** Architectural breakdowns, sensory cues, and anamorphic matte painting prompts.
 * **Audio Script & Narration View:** Filterable tabs for spoken dialogue, voice-overs, and narrator chunks with performance directives.
 * **Complete Scenes Breakdown View:** Full Hollywood scene cards with sluglines, actor blocking, dialogue sequences, foley soundscapes, and ComfyUI keyframe cards.
+* **Micro-Scenes & Video Takes View (6s-15s):** Take-by-take breakdown with audio timeline bars (2 words/sec), camera moves, and ready-to-render MiniMax H3 / Kling prompts.
 * **Dynamic Book Library:** Seamlessly scans, reads, and processes any EPUB or TXT file placed in `data/books/`.
 * **Zero Canvas Reset:** Reset databases to a clean slate with a single click.
 
@@ -158,6 +166,9 @@ python dialogue_production_graph.py --book "Solar Dragons Need Love Too 1"
 
 # Run complete Hollywood scene breakdown extraction
 python scene_production_graph.py --book "Solar Dragons Need Love Too 1" --scenes 12
+
+# Run 6s-15s micro-scenes / takes breakdown (2 words/sec speech standard)
+python micro_scene_production_graph.py
 ```
 
 ---
@@ -172,6 +183,7 @@ cinegraph-studio-ai/
 ├── voiceprint_production.py         # 5D Voice Design & English dialogue extractor
 ├── dialogue_production_graph.py     # Dialogue, V.O. & Narrator extraction graph
 ├── scene_production_graph.py        # Complete Hollywood scene breakdown engine
+├── micro_scene_production_graph.py  # 6s-15s AI Video Takes & 2 wps Pacing engine
 ├── run_agent.py                     # Headless CLI pipeline runner
 ├── Run_Studio.bat                   # One-click Windows studio launcher
 ├── requirements.txt                 # Production dependencies
@@ -186,6 +198,7 @@ cinegraph-studio-ai/
 │   ├── environment_bible.json       # Locked canonical environment profiles
 │   ├── script_bible.json            # Locked audio screenplay (dialogues, VO, narrator)
 │   ├── scene_bible.json             # Locked complete scenes with ComfyUI keyframes
+│   ├── micro_scenes_bible.json      # Locked 6s-15s generative takes with video prompts
 │   └── books/                       # Drag & drop your EPUB / TXT novels here
 │
 ├── docs/

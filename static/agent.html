@@ -138,8 +138,8 @@
           <span class="text-[10px] font-mono text-amber-400 font-bold uppercase">{{ targetType }}</span>
         </div>
 
-        <!-- Target Type Toggle: Characters vs Voiceprints vs Environments vs Script vs Scenes -->
-        <div class="grid grid-cols-5 gap-1">
+        <!-- Target Type Toggle: Characters vs Voiceprints vs Environments vs Script vs Scenes vs Shots -->
+        <div class="grid grid-cols-6 gap-1">
           <button @click="targetType = 'character'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'character' ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
             <span>👤 Chars</span>
           </button>
@@ -154,6 +154,9 @@
           </button>
           <button @click="targetType = 'scenes'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'scenes' ? 'bg-rose-500/20 border-rose-500 text-rose-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
             <span>🎬 Scenes</span>
+          </button>
+          <button @click="targetType = 'shots'" :class="['py-2 px-1 rounded-lg text-[10px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'shots' ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+            <span>⏱️ Takes</span>
           </button>
         </div>
 
@@ -239,6 +242,32 @@
           </p>
         </div>
 
+        <!-- Micro-Scenes / Shots Scope Details -->
+        <div v-else-if="targetType === 'shots'" class="flex flex-col gap-2">
+          <div class="p-2.5 rounded-lg bg-amber-950/20 border border-amber-700/40 text-xs text-amber-200 flex flex-col gap-1.5">
+            <div class="flex items-center justify-between font-bold">
+              <span>⏱️ Take Duration:</span>
+              <span class="font-mono text-amber-300">6.0s - 15.0s</span>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-gray-300">
+              <span>🎙️ Speech Pacing:</span>
+              <span class="font-mono text-emerald-400 font-bold">2.0 words / sec</span>
+            </div>
+            <p class="text-[10px] text-gray-400 leading-normal">
+              Decomposes master scenes into 6s-15s generative AI video shots. Each spoken line is strictly calibrated to 2 words per second.
+            </p>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] text-gray-400 font-medium">Filter Scene Focus (Optional):</label>
+            <select v-model="selectedSceneFilter" class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 font-medium">
+              <option value="all">🎬 All Master Scenes ({{ lockedScenes.length }})</option>
+              <option v-for="s in lockedScenes" :key="s.scene_number" :value="s.scene_number">
+                Scene #{{ s.scene_number }}: {{ s.slugline }}
+              </option>
+            </select>
+          </div>
+        </div>
+
         <div class="p-2.5 rounded-lg bg-gray-900/40 border border-gray-800 text-[11px] text-gray-400 flex flex-col gap-1">
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" v-model="autoCanonMode" class="rounded border-gray-700 text-amber-500 focus:ring-0">
@@ -249,10 +278,10 @@
       </div>
 
       <!-- Run Action Button -->
-      <button @click="runProductionAgent" :disabled="isRunning || !selectedBook" :class="['w-full py-3.5 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg', isRunning ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : !selectedBook ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : targetType === 'character' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 glow-amber' : targetType === 'voiceprint' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white glow-purple' : targetType === 'script' ? 'bg-gradient-to-r from-sky-400 to-sky-600 hover:from-sky-300 hover:to-sky-500 text-gray-950 shadow-sky-900/50' : targetType === 'scenes' ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 text-white shadow-rose-900/50' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-gray-950 glow-emerald']">
+      <button @click="runProductionAgent" :disabled="isRunning || !selectedBook" :class="['w-full py-3.5 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg', isRunning ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : !selectedBook ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : targetType === 'character' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 glow-amber' : targetType === 'voiceprint' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white glow-purple' : targetType === 'script' ? 'bg-gradient-to-r from-sky-400 to-sky-600 hover:from-sky-300 hover:to-sky-500 text-gray-950 shadow-sky-900/50' : targetType === 'scenes' ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 text-white shadow-rose-900/50' : targetType === 'shots' ? 'bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-gray-950 glow-amber' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-gray-950 glow-emerald']">
         <span v-if="isRunning" class="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
         <span v-else>🚀</span>
-        <span>{{ isRunning ? 'Extracting via GraphRAG + LangGraph...' : (targetType === 'character' ? 'Extract & Lock Characters' : targetType === 'voiceprint' ? 'Extract & Lock Voiceprint' : targetType === 'script' ? 'Extract Dialogue, VO & Narrator' : targetType === 'scenes' ? 'Extract & Lock Complete Scenes' : 'Extract & Lock Environments') }}</span>
+        <span>{{ isRunning ? 'Extracting via GraphRAG + LangGraph...' : (targetType === 'character' ? 'Extract & Lock Characters' : targetType === 'voiceprint' ? 'Extract & Lock Voiceprint' : targetType === 'script' ? 'Extract Dialogue, VO & Narrator' : targetType === 'scenes' ? 'Extract & Lock Complete Scenes' : targetType === 'shots' ? 'Decompose into 6s-15s Takes' : 'Extract & Lock Environments') }}</span>
       </button>
 
       <!-- Agent System Info -->
@@ -295,6 +324,11 @@
             <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-900/60 text-rose-300 font-mono">{{ lockedScenes.length }}</span>
           </button>
 
+          <button @click="activeTab = 'shots'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'shots' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50' : 'text-gray-400 hover:text-white']">
+            <span>⏱️ Takes (6s-15s)</span>
+            <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-900/60 text-amber-300 font-mono">{{ lockedShots.length }}</span>
+          </button>
+
           <button @click="activeTab = 'conflicts'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'conflicts' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50' : 'text-gray-400 hover:text-white']">
             <span>⚖️ HITL Arbitration</span>
             <span v-if="pendingConflicts.length > 0" class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-600 text-white font-mono animate-bounce">{{ pendingConflicts.length }}</span>
@@ -310,6 +344,8 @@
           <span class="text-sky-400 font-bold">{{ (scriptData.dialogues?.length || 0) + (scriptData.voice_overs?.length || 0) + (scriptData.narrator_chunks?.length || 0) }} Lines</span>
           <span class="text-gray-600">•</span>
           <span class="text-rose-400 font-bold">{{ lockedScenes.length }} Scenes</span>
+          <span class="text-gray-600">•</span>
+          <span class="text-amber-300 font-bold">{{ lockedShots.length }} Takes</span>
         </div>
       </div>
 
@@ -831,6 +867,188 @@
 
       </div>
 
+      <!-- TAB 6: MICRO-SCENES & SHOTS (6s - 15s) -->
+      <div v-show="activeTab === 'shots'" class="flex-1 p-4 overflow-y-auto flex flex-col gap-4">
+        
+        <!-- Header Bar with Filter & KPIs -->
+        <div class="flex items-center justify-between bg-[#0c121e] border border-gray-800 p-3.5 rounded-2xl flex-shrink-0 flex-wrap gap-3">
+          
+          <!-- Filters on the left -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-bold text-gray-400">Scene Filter:</span>
+            <select v-model="selectedSceneFilter" class="bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-amber-500 font-medium max-w-[220px]">
+              <option value="all">🎬 All Master Scenes ({{ lockedScenes.length }})</option>
+              <option v-for="s in lockedScenes" :key="s.scene_number" :value="s.scene_number">
+                #{{ s.scene_number }} · {{ s.slugline.substring(0, 32) }}...
+              </option>
+            </select>
+
+            <span class="text-gray-700">|</span>
+
+            <!-- Type Filter Buttons -->
+            <button @click="shotTypeFilter = 'all'" :class="['px-2.5 py-1 rounded-lg text-xs font-bold transition', shotTypeFilter === 'all' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50' : 'bg-gray-900/60 text-gray-400 hover:text-white']">
+              All Takes ({{ lockedShots.length }})
+            </button>
+            <button @click="shotTypeFilter = 'dialogue'" :class="['px-2.5 py-1 rounded-lg text-xs font-bold transition', shotTypeFilter === 'dialogue' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' : 'bg-gray-900/60 text-gray-400 hover:text-white']">
+              🗣️ Spoken Takes (2 wps)
+            </button>
+            <button @click="shotTypeFilter = 'action'" :class="['px-2.5 py-1 rounded-lg text-xs font-bold transition', shotTypeFilter === 'action' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/50' : 'bg-gray-900/60 text-gray-400 hover:text-white']">
+              🎬 Action & Establishing
+            </button>
+          </div>
+
+          <!-- KPIs & Action Buttons on the right -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2.5 py-1 rounded-lg bg-gray-900 border border-gray-700 text-xs font-mono font-bold text-amber-300 flex items-center gap-1">
+              <span>⏱️ 6s - 15s</span>
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-gray-900 border border-gray-700 text-xs font-mono font-bold text-emerald-300 flex items-center gap-1">
+              <span>🎙️ 2.0 words/s</span>
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-amber-950/60 border border-amber-800 text-xs font-mono font-bold text-amber-200">
+              ⏳ Runtime: {{ microScenesBible.total_runtime_formatted || '0m 00s' }}
+            </span>
+            <button @click="exportShotsJson" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 transition flex items-center gap-1.5">
+              <span>💾 Export Shot List JSON</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Zero State Placeholder -->
+        <div v-if="filteredShots.length === 0" class="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-gray-800/80 rounded-2xl">
+          <span class="text-4xl mb-2">⏱️</span>
+          <h3 class="text-sm font-bold text-gray-300">No Micro-Scenes / Takes Generated Yet</h3>
+          <p class="text-xs text-gray-500 mt-1 max-w-sm">Select 'Takes' under Extraction Target on the left and run the agent to decompose master scenes into 6s-15s generative takes with 2 words/second speech pacing.</p>
+        </div>
+
+        <!-- Shots Feed / Cards -->
+        <div v-else class="space-y-4">
+          <div v-for="sh in filteredShots" :key="sh.id" class="rounded-2xl bg-[#0c121e] border border-gray-800 p-5 flex flex-col gap-3.5 shadow-xl hover:border-gray-700 transition">
+            
+            <!-- Take Slate Header -->
+            <div class="flex items-start justify-between border-b border-gray-800/80 pb-3 flex-wrap gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2.5 py-1 rounded-lg bg-amber-500 text-gray-950 font-black text-xs font-mono shadow">
+                  {{ sh.shot_code }}
+                </span>
+                <span class="font-mono text-xs font-bold text-gray-200">
+                  Scene #{{ sh.scene_number }}: {{ sh.slugline }}
+                </span>
+                <span class="text-[11px] text-gray-400 font-medium">
+                  • {{ sh.shot_type }}
+                </span>
+              </div>
+
+              <!-- Big Duration & Speech Pacing Pill -->
+              <div class="flex items-center gap-2">
+                <span :class="['px-2.5 py-1 rounded-lg text-xs font-mono font-bold shadow flex items-center gap-1', getDurationBadgeClass(sh.duration_seconds)]">
+                  <span>⏱️ {{ sh.duration_seconds.toFixed(1) }}s</span>
+                </span>
+                <span v-if="sh.dialogue" class="px-2 py-1 rounded-lg bg-emerald-950/80 border border-emerald-800/60 text-emerald-300 text-[11px] font-mono font-bold">
+                  🎙️ 2.0 words/s ({{ sh.dialogue.words_count }} words)
+                </span>
+                <span v-else class="px-2 py-1 rounded-lg bg-gray-900 border border-gray-800 text-gray-400 text-[11px] font-mono">
+                  🔇 Pure Action / Foley
+                </span>
+              </div>
+            </div>
+
+            <!-- Audio & Visual Timing Breakdown Bar -->
+            <div class="p-2.5 rounded-xl bg-gray-950/80 border border-gray-800/80 flex flex-col gap-1.5">
+              <div class="flex items-center justify-between text-[10px] font-mono text-gray-400">
+                <span class="flex items-center gap-1">
+                  <span>Take Timeline Breakdown:</span>
+                  <strong class="text-white">{{ sh.duration_seconds.toFixed(1) }}s Total</strong>
+                </span>
+                <span v-if="sh.dialogue" class="text-emerald-400">
+                  {{ sh.dialogue.speech_duration_seconds.toFixed(1) }}s Spoken Audio + {{ sh.dialogue.buffer_seconds.toFixed(1) }}s Dramatic Buffer
+                </span>
+                <span v-else class="text-sky-400">
+                  {{ sh.duration_seconds.toFixed(1) }}s Visual Movement & Camera Track
+                </span>
+              </div>
+
+              <!-- Segmented Progress Bar -->
+              <div class="w-full h-3 bg-gray-900 rounded-full overflow-hidden flex border border-gray-800">
+                <div v-if="sh.dialogue" :style="{ width: ((sh.dialogue.speech_duration_seconds / sh.duration_seconds) * 100) + '%' }" class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 relative group cursor-pointer" :title="'Speech: ' + sh.dialogue.speech_duration_seconds + 's (' + sh.dialogue.words_count + ' words @ 2.0 wps)'">
+                </div>
+                <div v-if="sh.dialogue" :style="{ width: ((sh.dialogue.buffer_seconds / sh.duration_seconds) * 100) + '%' }" class="h-full bg-gradient-to-r from-indigo-500 to-sky-400 relative group cursor-pointer" :title="'Action Buffer: ' + sh.dialogue.buffer_seconds + 's'">
+                </div>
+                <div v-if="!sh.dialogue" style="width: 100%" class="h-full bg-gradient-to-r from-sky-500 to-indigo-500" :title="'Visual Action: ' + sh.duration_seconds + 's'">
+                </div>
+              </div>
+            </div>
+
+            <!-- Visual Action In This Take -->
+            <div class="text-xs text-gray-200 leading-relaxed flex items-start gap-2 bg-gray-900/40 p-3 rounded-xl border border-gray-800/60">
+              <span class="text-amber-400 font-bold text-xs flex-shrink-0">Action Blocking:</span>
+              <span>{{ sh.visual_action }}</span>
+            </div>
+
+            <!-- Dialogue & Spoken Line in Original English (if present) -->
+            <div v-if="sh.dialogue" class="p-3.5 rounded-xl bg-gray-950/90 border border-gray-800 flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span :class="['text-xs font-bold px-2 py-0.5 rounded-md font-mono', getSpeakerBadgeClass(sh.dialogue.speaker)]">
+                    👤 {{ sh.dialogue.speaker }}
+                  </span>
+                  <span class="text-[10px] font-mono text-gray-400">
+                    {{ sh.dialogue.words_count }} words · {{ sh.dialogue.speech_duration_seconds }}s speech @ 2.0 wps
+                  </span>
+                </div>
+                <button @click="copyPrompt(sh.dialogue.performance_instruction + ' ' + sh.dialogue.line_en)" class="text-[11px] text-sky-400 hover:text-sky-300 font-medium flex items-center gap-1">
+                  <span>📋 Copy Line + Directive</span>
+                </button>
+              </div>
+
+              <!-- The Spoken Line -->
+              <p class="text-sm font-semibold text-white italic">
+                "{{ sh.dialogue.line_en }}"
+              </p>
+
+              <!-- Acting Directive -->
+              <div class="p-2 rounded-lg bg-sky-950/20 border border-sky-800/30 text-[11px] font-mono text-sky-200">
+                {{ sh.acting_directive }}
+              </div>
+            </div>
+
+            <!-- Camera Setup & Foley Audio -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              <div class="p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/80 text-gray-300 flex items-center gap-2">
+                <span class="text-amber-400 text-sm flex-shrink-0">📹</span>
+                <div>
+                  <strong class="text-gray-400">Camera & Lens:</strong> {{ sh.lens_spec }} — {{ sh.camera_motion }}
+                </div>
+              </div>
+              <div class="p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/80 text-indigo-200 flex items-center gap-2">
+                <span class="text-indigo-400 text-sm flex-shrink-0">🎧</span>
+                <div>
+                  <strong class="text-indigo-300">Soundscape & Foley:</strong> {{ sh.soundscape_and_foley }}
+                </div>
+              </div>
+            </div>
+
+            <!-- AI Video Prompt (MiniMax H3 / Kling / Runway Gen-3 Ready) -->
+            <div class="flex flex-col gap-1.5 pt-1">
+              <div class="flex items-center justify-between text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+                <span class="flex items-center gap-1">
+                  <span>🎬 AI Video Generation Prompt (MiniMax H3 / Kling 1.5 / Runway Gen-3):</span>
+                </span>
+                <button @click="copyPrompt(sh.ai_video_prompt)" class="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-gray-950 text-xs font-bold transition flex items-center gap-1">
+                  <span>📋 Copy Video Prompt</span>
+                </button>
+              </div>
+              <div class="p-3 rounded-xl bg-black/60 border border-gray-800 font-mono text-[11px] text-gray-300 leading-relaxed select-all">
+                {{ sh.ai_video_prompt }}
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
     </main>
 
   </div>
@@ -925,6 +1143,15 @@ createApp({
     const pendingConflicts = ref([]);
     const lockedScenes = ref([]);
     const sceneCountTarget = ref(12);
+
+    // Micro-Scenes / Takes Scope & State (6s - 15s, 2 words/sec)
+    const lockedShots = ref([]);
+    const microScenesBible = ref({ total_shots: 0, total_runtime_formatted: '0m 00s' });
+    const selectedSceneFilter = ref('all');
+    const shotTypeFilter = ref('all');
+    const minDurationTarget = ref(6.0);
+    const maxDurationTarget = ref(15.0);
+    const speechPacingRate = ref(2.0);
 
     const onBookSelected = () => {
       selectedBookInfo.value = books.value.find(b => b.id === selectedBook.value) || null;
@@ -1063,6 +1290,57 @@ createApp({
       }
     };
 
+    const filteredShots = computed(() => {
+      let shots = lockedShots.value || [];
+      if (selectedSceneFilter.value !== 'all') {
+        const scNum = parseInt(selectedSceneFilter.value);
+        shots = shots.filter(s => s.scene_number === scNum);
+      }
+      if (shotTypeFilter.value === 'dialogue') {
+        shots = shots.filter(s => s.dialogue != null);
+      } else if (shotTypeFilter.value === 'action') {
+        shots = shots.filter(s => s.dialogue == null);
+      }
+      return shots;
+    });
+
+    const getDurationBadgeClass = (dur) => {
+      if (dur < 8.0) return 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
+      if (dur <= 12.0) return 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60';
+      return 'bg-purple-950/80 text-purple-300 border border-purple-700/60';
+    };
+
+    const exportShotsJson = () => {
+      const payload = {
+        novel_title: selectedBookInfo.value ? selectedBookInfo.value.title : selectedBook.value,
+        pacing_standard: "2.0 words per second",
+        duration_range: "6.0s - 15.0s per take",
+        total_shots: lockedShots.value.length,
+        total_runtime_formatted: microScenesBible.value.total_runtime_formatted || '0m 00s',
+        shots: lockedShots.value
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `micro_scenes_takes_${selectedBook.value}.json`;
+      a.click();
+      addLog("[Export] Micro-scenes shot list exported to JSON!");
+    };
+
+    const fetchLockedMicroScenes = async () => {
+      try {
+        const res = await fetch('/api/agent/micro_scenes');
+        const data = await res.json();
+        if (data) {
+          microScenesBible.value = data;
+          if (data.shots) lockedShots.value = data.shots;
+        }
+      } catch (e) {
+        console.log("Micro-scenes fetch error:", e);
+      }
+    };
+
     const executeStudioReset = async () => {
       try {
         const res = await fetch('/api/agent/reset', { method: 'POST' });
@@ -1071,6 +1349,8 @@ createApp({
         lockedEnvironments.value = [];
         pendingConflicts.value = [];
         lockedScenes.value = [];
+        lockedShots.value = [];
+        microScenesBible.value = { total_shots: 0, total_runtime_formatted: '0m 00s' };
         scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
         pipelineSteps.value.forEach(s => s.status = 'ready');
         addLog("[StudioReset] Databases successfully zeroed out. Studio is clean.");
@@ -1081,6 +1361,8 @@ createApp({
         lockedEnvironments.value = [];
         pendingConflicts.value = [];
         lockedScenes.value = [];
+        lockedShots.value = [];
+        microScenesBible.value = { total_shots: 0, total_runtime_formatted: '0m 00s' };
         scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
         addLog("[StudioReset] Local reset completed. Ready for fresh novel.");
         closeResetModal();
@@ -1092,7 +1374,7 @@ createApp({
       activeTab.value = 'pipeline';
       pipelineSteps.value.forEach(s => s.status = 'ready');
 
-      const domainName = targetType.value === 'character' ? 'Characters' : targetType.value === 'voiceprint' ? 'Voiceprints' : targetType.value === 'script' ? 'Dialogue & Audio Script' : targetType.value === 'scenes' ? 'Complete Scenes' : 'Environments';
+      const domainName = targetType.value === 'character' ? 'Characters' : targetType.value === 'voiceprint' ? 'Voiceprints' : targetType.value === 'script' ? 'Dialogue & Audio Script' : targetType.value === 'scenes' ? 'Complete Scenes' : targetType.value === 'shots' ? 'Micro-Scenes & Takes' : 'Environments';
       addLog(`[Agent] Initiating GraphRAG + LangGraph Pipeline for ${domainName}: ${selectedBookInfo.value ? selectedBookInfo.value.title : selectedBook.value}`);
       
       // Step 1: Ingestion
@@ -1170,6 +1452,23 @@ createApp({
           if (data.logs) data.logs.forEach(l => addLog(l));
           addLog(`[PipelineComplete] ${lockedScenes.value.length} Complete Hollywood Production Scenes locked!`);
           activeTab.value = 'scenes';
+        } else if (targetType.value === 'shots') {
+          const res = await fetch('/api/agent/run_micro_scenes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              book_id: selectedBook.value,
+              min_duration: parseFloat(minDurationTarget.value) || 6.0,
+              max_duration: parseFloat(maxDurationTarget.value) || 15.0,
+              words_per_sec: parseFloat(speechPacingRate.value) || 2.0
+            })
+          });
+          const data = await res.json();
+          if (data.shots) lockedShots.value = data.shots;
+          if (data.micro_scenes) microScenesBible.value = data.micro_scenes;
+          if (data.logs) data.logs.forEach(l => addLog(l));
+          addLog(`[PipelineComplete] ${lockedShots.value.length} Generative Video Takes locked (6s-15s, 2.0 wps)!`);
+          activeTab.value = 'shots';
         } else {
           const locParam = envExecutionMode.value === 'single' ? targetLocationName.value : 'Meteoropolis Reincarnation Laboratories';
           const res = await fetch('/api/agent/run_environment', {
@@ -1196,6 +1495,8 @@ createApp({
           activeTab.value = 'script';
         } else if (targetType.value === 'scenes') {
           activeTab.value = 'scenes';
+        } else if (targetType.value === 'shots') {
+          activeTab.value = 'shots';
         } else {
           activeTab.value = 'environments';
         }
@@ -1209,6 +1510,7 @@ createApp({
         fetchLockedEnvironments();
         fetchScriptData();
         fetchLockedScenes();
+        fetchLockedMicroScenes();
       } finally {
         isRunning.value = false;
       }
@@ -1275,6 +1577,7 @@ createApp({
       fetchLockedEnvironments();
       fetchScriptData();
       fetchLockedScenes();
+      fetchLockedMicroScenes();
     });
 
     return {
@@ -1284,6 +1587,9 @@ createApp({
       scriptScope, scriptCharacter, scriptFilter, scriptData, filteredScriptItems,
       getSpeakerBadgeClass, exportScriptJson, fetchScriptData,
       lockedScenes, sceneCountTarget, exportScenesJson, fetchLockedScenes,
+      lockedShots, microScenesBible, selectedSceneFilter, shotTypeFilter,
+      minDurationTarget, maxDurationTarget, speechPacingRate, filteredShots,
+      getDurationBadgeClass, exportShotsJson, fetchLockedMicroScenes,
       autoCanonMode, books, selectedBook, selectedBookInfo, onBookSelected,
       pipelineSteps, logs, logContainer, clearLogs, getLogColor, getStepClass, getStepIcon,
       lockedCharacters, lockedEnvironments, pendingConflicts, openResetModal, closeResetModal,
