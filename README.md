@@ -70,7 +70,7 @@ Generative AI video models (Runway, Kling, Sora, MiniMax H3) have unlocked hyper
 
 ### 3. 🎙️ 5-Dimension Acoustic Voice Design (Qwen3-TTS / CosyVoice)
 * **The 5-Dimension Formula:** Formulates character voiceprints strictly conforming to:
-  $$\text{Voiceprint} = [\text{Persona \& Age}] + [\text{Timbre \& Pitch}] + [\text{Pacing \& Cadence}] + [\text{Emotional Baseline}] + [\text{Microphone Acoustics}]$$
+  $$\text{Voiceprint} = [\text{Persona and Age}] + [\text{Timbre and Pitch}] + [\text{Pacing and Cadence}] + [\text{Emotional Baseline}] + [\text{Microphone Acoustics}]$$
 * **Verbatim English Dialogue Samples:** Extracts actual spoken lines in the novel's original English.
 * **Line-by-Line Performance Directives:** Prepends nuanced performance instructions (e.g., `[Instruction: Seductive whisper with slight vocal fry, dry close-mic studio recording, zero reverb]`).
 
