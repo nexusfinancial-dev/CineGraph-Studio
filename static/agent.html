@@ -123,10 +123,22 @@
           <span class="text-[10px] text-gray-500 font-mono">{{ books.length }} novels available</span>
         </div>
 
-        <select v-model="selectedBook" @change="onBookSelected" class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 transition">
-          <option value="" disabled>-- Select a novel from library --</option>
-          <option v-for="b in books" :key="b.id" :value="b.id">{{ b.title }}</option>
-        </select>
+        <div class="flex flex-col gap-2">
+          <select v-model="selectedBook" @change="onBookSelected" class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 transition">
+            <option value="" disabled>-- Select a novel from library --</option>
+            <option v-for="b in books" :key="b.id" :value="b.id">{{ b.title }}</option>
+          </select>
+
+          <!-- Upload Novel Button -->
+          <div class="flex items-center gap-2">
+            <input type="file" ref="fileInput" @change="handleFileUpload" accept=".epub,.txt" class="hidden" />
+            <button @click="$refs.fileInput.click()" :disabled="isUploading" class="w-full py-1.5 px-3 rounded-lg bg-gray-800/90 hover:bg-gray-700 text-xs font-semibold text-gray-200 border border-gray-700 transition flex items-center justify-center gap-1.5 shadow disabled:opacity-50">
+              <span v-if="isUploading" class="animate-spin text-xs">⏳</span>
+              <span v-else>📤</span>
+              <span>{{ isUploading ? 'Uploading & Adding...' : 'Upload Novel (EPUB / TXT)' }}</span>
+            </button>
+          </div>
+        </div>
 
         <div v-if="selectedBookInfo" class="p-2.5 rounded-lg bg-gray-900/70 border border-gray-800 text-[11px] text-gray-400 flex flex-col gap-1">
           <div class="flex justify-between"><span class="text-gray-500">File:</span> <span class="font-mono text-gray-300 truncate max-w-[200px]">{{ selectedBookInfo.filename }}</span></div>
@@ -1838,6 +1850,41 @@ createApp({
       }
     };
 
+    const fileInput = ref(null);
+    const isUploading = ref(false);
+
+    const handleFileUpload = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      isUploading.value = true;
+      addLog(`[Upload] Uploading novel: ${file.name} to studio library (data/books/)...`);
+      try {
+        const res = await fetch('/api/upload_book', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          addLog(`[Upload Success] ${file.name} successfully stored and available in library!`);
+          await fetchBooks();
+          const found = books.value.find(b => b.filename === file.name || b.title.includes(file.name));
+          if (found) {
+            selectedBook.value = found.id;
+            onBookSelected();
+          }
+        } else {
+          addLog(`[Upload Error] ${data.detail || 'Upload failed'}`);
+        }
+      } catch (err) {
+        addLog(`[Upload Error] ${err.message}`);
+      } finally {
+        isUploading.value = false;
+        event.target.value = '';
+      }
+    };
+
     const fetchBooks = async () => {
       try {
         const res = await fetch('/api/books');
@@ -1886,7 +1933,8 @@ createApp({
       lockedCharacters, lockedEnvironments, pendingConflicts, openResetModal, closeResetModal,
       executeStudioReset, runProductionAgent, resolveConflict, copyPrompt,
       renderingVoices, renderingKeyframes, renderingVideos, renderingEnvs, activeShotPromptTab,
-      renderShotVoice, renderShotKeyframe, renderShotVideo, renderEnvironmentMatte, renderScriptLineVoice
+      renderShotVoice, renderShotKeyframe, renderShotVideo, renderEnvironmentMatte, renderScriptLineVoice,
+      fileInput, isUploading, handleFileUpload
     };
   }
 }).mount('#app');
