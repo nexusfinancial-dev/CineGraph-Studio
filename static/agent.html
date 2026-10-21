@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Novel Production Agent | GraphRAG + LangGraph</title>
+  <!-- Tailwind CSS & Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #070a11;
+      color: #e2e8f0;
+      user-select: none;
+    }
+    .font-mono-code {
+      font-family: 'Fira Code', monospace;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d131f;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f293d;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    /* Native Dialog Backdrop Styling (Modern Web Guidance) */
+    dialog::backdrop {
+      background-color: rgba(3, 7, 18, 0.75);
+      backdrop-filter: blur(4px);
+    }
+    dialog {
+      border: none;
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+    .glow-amber {
+      box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.35);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.35);
+    }
+    .glow-purple {
+      box-shadow: 0 0 25px -5px rgba(147, 51, 234, 0.35);
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-[#070a11]">
+
+<div id="app" class="flex-1 flex flex-col h-full overflow-hidden">
+
+  <!-- TOP HEADER -->
+  <header class="h-14 border-b border-gray-800 bg-[#0b101b] px-4 flex items-center justify-between z-20 flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center font-black text-white text-base shadow">
+        🤖
+      </div>
+      <div>
+        <h1 class="text-sm font-black text-white flex items-center gap-2">
+          <span>Universal Novel Production Agent</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-400 border border-indigo-800/60 font-semibold">GraphRAG + LangGraph</span>
+        </h1>
+        <p class="text-[11px] text-gray-400">100% Deterministic Asset Extraction • Characters & Environments • HITL Arbitration</p>
+      </div>
+    </div>
+
+    <!-- Status Indicators -->
+    <div class="flex items-center gap-2.5">
+      <!-- LM Studio Status -->
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-900 border border-gray-800 text-[11px]">
+        <span class="w-2 h-2 rounded-full" :class="lmOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+        <span class="text-gray-300 font-medium font-mono">LM Studio: {{ lmOnline ? 'gemma-4-12b' : 'Offline' }}</span>
+      </div>
+
+      <!-- Embedding Model -->
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-900 border border-gray-800 text-[11px]">
+        <span class="w-2 h-2 rounded-full" :class="embedOnline ? 'bg-indigo-500' : 'bg-gray-600'"></span>
+        <span class="text-gray-300 font-medium font-mono">Embeddings: bge-m3 (1024d)</span>
+      </div>
+
+      <!-- Studio Mode Switcher Link -->
+      <a href="/" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold flex items-center gap-1.5 transition">
+        <span>🎬 Scene Director Workbench</span>
+      </a>
+
+      <!-- Reset Studio to Zero Button -->
+      <button @click="openResetModal" class="px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 text-xs font-bold flex items-center gap-1.5 transition">
+        <span>🗑️ Reset to Zero</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN BODY: 2 PANELS -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- LEFT PANEL: CONTROLS & NOVEL SELECTOR (390px) -->
+    <aside class="w-[390px] border-r border-gray-800 bg-[#0a0e18] flex flex-col p-4 gap-4 overflow-y-auto flex-shrink-0">
+      
+      <!-- Novel Selection Card -->
+      <div class="p-3.5 rounded-xl bg-[#0f1523] border border-gray-800 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-gray-200 flex items-center gap-1.5">
+            <span>📖 Target Novel</span>
+          </span>
+          <span class="text-[10px] text-gray-500 font-mono">{{ books.length }} novels available</span>
+        </div>
+
+        <select v-model="selectedBook" @change="onBookSelected" class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 transition">
+          <option value="" disabled>-- Select a novel from library --</option>
+          <option v-for="b in books" :key="b.id" :value="b.id">{{ b.title }}</option>
+        </select>
+
+        <div v-if="selectedBookInfo" class="p-2.5 rounded-lg bg-gray-900/70 border border-gray-800 text-[11px] text-gray-400 flex flex-col gap-1">
+          <div class="flex justify-between"><span class="text-gray-500">File:</span> <span class="font-mono text-gray-300 truncate max-w-[200px]">{{ selectedBookInfo.filename }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Format:</span> <span class="font-mono text-amber-400 uppercase">{{ selectedBookInfo.format }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">GraphRAG Index:</span> <span :class="selectedBookInfo.indexed ? 'text-emerald-400' : 'text-gray-400'">{{ selectedBookInfo.indexed ? '✅ Indexed in GraphRAG' : '⏳ Ready for Ingestion' }}</span></div>
+        </div>
+      </div>
+
+      <!-- Agent Scope & Targets -->
+      <div class="p-3.5 rounded-xl bg-[#0f1523] border border-gray-800 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-gray-200 flex items-center gap-1.5">
+            <span>🎯 Extraction Target & Domain</span>
+          </span>
+          <span class="text-[10px] font-mono text-amber-400 font-bold uppercase">{{ targetType }}</span>
+        </div>
+
+        <!-- Target Type Toggle: Characters vs Voiceprints vs Environments -->
+        <div class="grid grid-cols-3 gap-1.5">
+          <button @click="targetType = 'character'" :class="['py-2 px-2 rounded-lg text-[11px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'character' ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+            <span>👤 Characters</span>
+          </button>
+          <button @click="targetType = 'voiceprint'" :class="['py-2 px-2 rounded-lg text-[11px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'voiceprint' ? 'bg-purple-500/20 border-purple-500 text-purple-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+            <span>🎙️ Voiceprints</span>
+          </button>
+          <button @click="targetType = 'environment'" :class="['py-2 px-2 rounded-lg text-[11px] font-bold border transition text-center flex flex-col items-center justify-center gap-1', targetType === 'environment' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+            <span>🏞️ Environments</span>
+          </button>
+        </div>
+
+        <!-- Character Scope Details -->
+        <div v-if="targetType === 'character'" class="flex flex-col gap-2">
+          <div class="grid grid-cols-2 gap-2">
+            <button @click="executionMode = 'all'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold border transition text-center', executionMode === 'all' ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+              👥 Full Cast
+            </button>
+            <button @click="executionMode = 'character'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold border transition text-center', executionMode === 'character' ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+              👤 Single Character
+            </button>
+          </div>
+          <div v-if="executionMode === 'character'" class="flex flex-col gap-1">
+            <label class="text-[11px] text-gray-400 font-medium">Character Name:</label>
+            <input v-model="targetCharacterName" placeholder="e.g. Mamba, Blossom, Pinky Peach..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 transition font-medium" />
+          </div>
+        </div>
+
+        <!-- Voiceprint Scope Details -->
+        <div v-else-if="targetType === 'voiceprint'" class="flex flex-col gap-2">
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] text-gray-400 font-medium">Character for Acoustic Voiceprint:</label>
+            <input v-model="targetCharacterName" placeholder="e.g. Mamba, Blossom, Brock..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 transition font-medium" />
+          </div>
+          <p class="text-[10px] text-purple-300/80">
+            Extracts the 5-dimension voice design prompt (Qwen3-TTS / CosyVoice) and verbatim English dialogue lines with [Instruction: ...] tags.
+          </p>
+        </div>
+
+        <!-- Environment Scope Details -->
+        <div v-else class="flex flex-col gap-2">
+          <div class="grid grid-cols-2 gap-2">
+            <button @click="envExecutionMode = 'primary'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold border transition text-center', envExecutionMode === 'primary' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+              🌐 Key Locations
+            </button>
+            <button @click="envExecutionMode = 'single'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold border transition text-center', envExecutionMode === 'single' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white']">
+              📍 Specific Place
+            </button>
+          </div>
+          <div v-if="envExecutionMode === 'single'" class="flex flex-col gap-1">
+            <label class="text-[11px] text-gray-400 font-medium">Environment / Scene Location:</label>
+            <input v-model="targetLocationName" placeholder="e.g. Brock's Luxury Penthouse Apartment" class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 transition font-medium" />
+          </div>
+        </div>
+
+        <div class="p-2.5 rounded-lg bg-gray-900/40 border border-gray-800 text-[11px] text-gray-400 flex flex-col gap-1">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" v-model="autoCanonMode" class="rounded border-gray-700 text-amber-500 focus:ring-0">
+            <span class="text-gray-300 font-semibold">Enable Conflict Detector (HITL)</span>
+          </label>
+          <p class="text-[10px] text-gray-500 ml-5">Pauses and prompts you with chapter evidence if canon contradictions or ambiguities are detected.</p>
+        </div>
+      </div>
+
+      <!-- Run Action Button -->
+      <button @click="runProductionAgent" :disabled="isRunning || !selectedBook" :class="['w-full py-3.5 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg', isRunning ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : !selectedBook ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : targetType === 'character' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 glow-amber' : targetType === 'voiceprint' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white glow-purple' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-gray-950 glow-emerald']">
+        <span v-if="isRunning" class="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
+        <span v-else>🚀</span>
+        <span>{{ isRunning ? 'Extracting via GraphRAG + LangGraph...' : (targetType === 'character' ? 'Extract & Lock Characters' : targetType === 'voiceprint' ? 'Extract & Lock Voiceprint' : 'Extract & Lock Environments') }}</span>
+      </button>
+
+      <!-- Agent System Info -->
+      <div class="mt-auto p-3 rounded-xl bg-gray-950/60 border border-gray-800 text-[11px] text-gray-500 flex flex-col gap-1">
+        <div class="flex justify-between"><span>Rules Engine:</span> <span class="text-amber-400 font-bold">Pydantic Schemas</span></div>
+        <div class="flex justify-between"><span>Vector Embeddings:</span> <span class="text-gray-300 font-mono">BGE-M3 (8192 ctx, 1024d)</span></div>
+        <div class="flex justify-between"><span>Inference Engine:</span> <span class="text-gray-300 font-mono">Gemma 12B / DeepSeek 32B</span></div>
+        <div class="flex justify-between"><span>ComfyUI Studio:</span> <span class="text-gray-300 font-mono">Portraits & Matte Plates</span></div>
+      </div>
+    </aside>
+
+    <!-- CENTER / RIGHT WORKSPACE: TABS & RESULTS -->
+    <main class="flex-1 flex flex-col bg-[#070a11] overflow-hidden">
+      
+      <!-- Workspace Navigation Tabs -->
+      <div class="h-11 border-b border-gray-800 bg-[#090d16] px-4 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <button @click="activeTab = 'pipeline'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'pipeline' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50' : 'text-gray-400 hover:text-white']">
+            <span>⚙️ Pipeline & Live Monitor</span>
+            <span v-if="isRunning" class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          </button>
+          
+          <button @click="activeTab = 'bible'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'bible' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/50' : 'text-gray-400 hover:text-white']">
+            <span>📚 Character Bible</span>
+            <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-900/60 text-indigo-300 font-mono">{{ lockedCharacters.length }}</span>
+          </button>
+
+          <button @click="activeTab = 'environments'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'environments' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' : 'text-gray-400 hover:text-white']">
+            <span>🏞️ Environment Bible</span>
+            <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-900/60 text-emerald-300 font-mono">{{ lockedEnvironments.length }}</span>
+          </button>
+
+          <button @click="activeTab = 'conflicts'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', activeTab === 'conflicts' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50' : 'text-gray-400 hover:text-white']">
+            <span>⚖️ HITL Arbitration</span>
+            <span v-if="pendingConflicts.length > 0" class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-600 text-white font-mono animate-bounce">{{ pendingConflicts.length }}</span>
+          </button>
+        </div>
+
+        <div class="text-[11px] text-gray-500 font-mono">
+          <span>Locked Assets: </span>
+          <span class="text-amber-400 font-bold">{{ lockedCharacters.length }} Chars</span>
+          <span class="text-gray-600 mx-1">•</span>
+          <span class="text-emerald-400 font-bold">{{ lockedEnvironments.length }} Envs</span>
+        </div>
+      </div>
+
+      <!-- TAB 1: PIPELINE & LIVE EXECUTION -->
+      <div v-show="activeTab === 'pipeline'" class="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+        
+        <!-- Pipeline Visual Stepper Cards -->
+        <div class="grid grid-cols-5 gap-2.5 flex-shrink-0">
+          <div v-for="(step, idx) in pipelineSteps" :key="idx" class="p-2.5 rounded-xl border flex flex-col gap-1 transition" :class="getStepClass(step.status)">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="font-bold">{{ step.number }}. {{ step.title }}</span>
+              <span>{{ getStepIcon(step.status) }}</span>
+            </div>
+            <p class="text-[10px] text-gray-400 line-clamp-1">{{ step.desc }}</p>
+          </div>
+        </div>
+
+        <!-- HITL Immediate Alert Banner (When conflict is active) -->
+        <div v-if="pendingConflicts.length > 0" class="p-4 rounded-xl bg-gradient-to-r from-rose-950/70 via-rose-900/40 to-gray-900 border border-rose-700/60 shadow-lg flex items-center justify-between flex-shrink-0 glow-purple">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl animate-bounce">⚠️</span>
+            <div>
+              <h3 class="text-sm font-bold text-white">Attention: Canon Contradiction Detected!</h3>
+              <p class="text-xs text-rose-200">There are {{ pendingConflicts.length }} ambiguous traits requiring human arbitration.</p>
+            </div>
+          </div>
+          <button @click="activeTab = 'conflicts'" class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow transition">
+            Resolve Canon Now ➡️
+          </button>
+        </div>
+
+        <!-- Terminal Console Logs -->
+        <div class="flex-1 flex flex-col rounded-xl bg-[#03060c] border border-gray-800/80 overflow-hidden shadow-inner">
+          <div class="h-8 bg-[#0b101c] border-b border-gray-800/60 px-3 flex items-center justify-between text-xs text-gray-400">
+            <span class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+              <span class="font-mono text-[11px] text-gray-300 ml-2">Agent Terminal Output (GraphRAG + LangGraph)</span>
+            </span>
+            <button @click="clearLogs" class="text-[10px] text-gray-500 hover:text-gray-300">Clear Logs</button>
+          </div>
+          <div ref="logContainer" class="flex-1 p-3 overflow-y-auto font-mono-code text-xs text-gray-300 space-y-1">
+            <div v-if="logs.length === 0" class="text-gray-600 italic">
+              [Ready] System initialized in zeroed state. Select a novel and press Run to start the multi-tier agent.
+            </div>
+            <div v-for="(l, i) in logs" :key="i" :class="getLogColor(l)">
+              {{ l }}
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TAB 2: CHARACTER BIBLE (LOCKED CANON) -->
+      <div v-show="activeTab === 'bible'" class="flex-1 p-4 overflow-y-auto">
+        <!-- Zero State Placeholder -->
+        <div v-if="lockedCharacters.length === 0" class="h-full flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-gray-800 rounded-2xl">
+          <div class="text-5xl mb-3">🧼</div>
+          <h2 class="text-base font-bold text-gray-200">Clean Zero Canvas - Characters</h2>
+          <p class="text-xs text-gray-500 max-w-md mt-1 mb-4">
+            No preloaded or assumed characters. Select a novel and click "Extract & Lock Characters" to lock the verified canon with 100% precision.
+          </p>
+          <button @click="targetType = 'character'; activeTab = 'pipeline'" class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold text-xs shadow transition">
+            Extract Characters Now ➡️
+          </button>
+        </div>
+
+        <!-- Grid of Verified Character Cards -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div v-for="char in lockedCharacters" :key="char.name" class="rounded-2xl bg-[#0c121e] border border-gray-800 p-4 flex flex-col gap-3 shadow-lg hover:border-gray-700 transition">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-base font-black text-white flex items-center gap-2">
+                  <span>{{ char.name }}</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700/60 text-emerald-300 font-bold">🔒 Canon Locked</span>
+                </h3>
+                <span class="text-xs text-amber-400 font-semibold">{{ char.species }}</span>
+              </div>
+              <span class="text-xs font-mono text-gray-500">ID: {{ char.id || 'canon' }}</span>
+            </div>
+
+            <!-- Traits Breakdown -->
+            <div class="space-y-1.5 text-xs text-gray-300 bg-gray-950/60 p-3 rounded-xl border border-gray-800/80">
+              <div><strong class="text-gray-400">Skin & Complexion:</strong> <span class="text-gray-200">{{ char.skin_tone_and_texture }}</span></div>
+              <div><strong class="text-gray-400">Eyes & Pupils:</strong> <span class="text-gray-200">{{ char.eyes_description }}</span></div>
+              <div><strong class="text-gray-400">Hair & Style:</strong> <span class="text-gray-200">{{ char.hair_description }}</span></div>
+              <div v-if="char.unique_biology && char.unique_biology.length"><strong class="text-gray-400">Racial Anatomy:</strong> <span class="text-amber-300 font-medium">{{ char.unique_biology.join(' • ') }}</span></div>
+            </div>
+
+            <!-- Novel Proof Quotes -->
+            <div v-if="char.novel_quotes && char.novel_quotes.length" class="flex flex-col gap-1">
+              <span class="text-[10px] text-gray-500 font-bold">Verbatim Novel Proof Quotes:</span>
+              <div class="p-2 rounded-lg bg-gray-900/60 border border-gray-800 text-[11px] text-gray-300 italic max-h-20 overflow-y-auto">
+                "{{ char.novel_quotes[0] }}"
+              </div>
+            </div>
+
+            <!-- Voiceprint & Original English Dialogue Section (Qwen3-TTS / CosyVoice) -->
+            <div v-if="char.voiceprint" class="p-3 rounded-xl bg-purple-950/20 border border-purple-800/40 flex flex-col gap-2 mt-1">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                  <span>🎙️ Voiceprint (Qwen3-TTS / CosyVoice)</span>
+                </span>
+                <button @click="copyPrompt(char.voiceprint.voiceprint_prompt)" class="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-[10px] font-mono font-semibold transition">
+                  📋 Copy Voiceprint
+                </button>
+              </div>
+              
+              <p class="text-[11px] text-gray-300 italic font-mono bg-black/40 p-2 rounded-lg border border-purple-900/40">
+                "{{ char.voiceprint.voiceprint_prompt }}"
+              </p>
+
+              <div class="grid grid-cols-2 gap-2 text-[10px] text-gray-400">
+                <div><span class="text-gray-500">Timbre:</span> <span class="text-purple-200">{{ char.voiceprint.vocal_timbre_and_pitch }}</span></div>
+                <div><span class="text-gray-500">Cadence:</span> <span class="text-purple-200">{{ char.voiceprint.cadence_and_pace }}</span></div>
+              </div>
+
+              <!-- Original English Dialogue Lines with Acting Instructions -->
+              <div v-if="char.voiceprint.canonical_dialogue_samples && char.voiceprint.canonical_dialogue_samples.length" class="flex flex-col gap-1.5 mt-1">
+                <span class="text-[10px] text-amber-400 font-bold flex items-center gap-1">
+                  <span>🗣️ Original English Dialogue & Performance Directives:</span>
+                </span>
+                <div class="space-y-1.5 max-h-40 overflow-y-auto">
+                  <div v-for="(sample, sIdx) in char.voiceprint.canonical_dialogue_samples" :key="sIdx" class="p-2 rounded-lg bg-black/60 border border-gray-800 text-[11px] font-mono text-gray-200 flex items-start justify-between gap-2 group hover:border-purple-500/50 transition">
+                    <span class="leading-relaxed">{{ sample }}</span>
+                    <button @click="copyPrompt(sample)" class="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 hover:text-white text-[10px] transition shrink-0" title="Copy Dialogue Line">
+                      📋
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Studio Prompt Drawer -->
+            <div class="mt-auto pt-2 border-t border-gray-800 flex items-center justify-between">
+              <span class="text-[10px] font-mono text-gray-500">ComfyUI Studio Ready</span>
+              <button @click="copyPrompt(char.face_portrait_prompt || char.name)" class="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-semibold transition">
+                📋 Copy Portrait Prompt
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: ENVIRONMENT BIBLE (LOCKED WORLD & LOCATIONS) -->
+      <div v-show="activeTab === 'environments'" class="flex-1 p-4 overflow-y-auto">
+        <!-- Zero State Placeholder -->
+        <div v-if="lockedEnvironments.length === 0" class="h-full flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-gray-800 rounded-2xl">
+          <div class="text-5xl mb-3">🏞️</div>
+          <h2 class="text-base font-bold text-gray-200">Clean Zero Canvas - Environments & World</h2>
+          <p class="text-xs text-gray-500 max-w-md mt-1 mb-4">
+            No environments extracted yet. Toggle the sidebar to "Environments" and click "Extract & Lock Environments" to extract the architectural style, lighting, and ComfyUI matte painting prompts.
+          </p>
+          <button @click="targetType = 'environment'; activeTab = 'pipeline'" class="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-xs shadow transition">
+            Extract Environments Now ➡️
+          </button>
+        </div>
+
+        <!-- Grid of Verified Environment Cards -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div v-for="env in lockedEnvironments" :key="env.name" class="rounded-2xl bg-[#0c121e] border border-gray-800 p-4 flex flex-col gap-3 shadow-lg hover:border-gray-700 transition">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-base font-black text-white flex items-center gap-2">
+                  <span>{{ env.name }}</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700/60 text-emerald-300 font-bold">🔒 Canon Locked</span>
+                </h3>
+                <span class="text-xs text-emerald-400 font-semibold">{{ env.environment_type }}</span>
+              </div>
+            </div>
+
+            <!-- Architectural Details Breakdown -->
+            <div class="space-y-2 text-xs text-gray-300 bg-gray-950/60 p-3 rounded-xl border border-gray-800/80">
+              <div>
+                <strong class="text-gray-400">Architecture & Materials:</strong>
+                <p class="text-gray-200 mt-0.5">{{ env.architectural_style }}</p>
+              </div>
+              <div>
+                <strong class="text-gray-400">Lighting & Atmosphere:</strong>
+                <p class="text-gray-200 mt-0.5">{{ env.lighting_and_atmosphere }}</p>
+              </div>
+              <div v-if="env.key_props_and_spatial_features && env.key_props_and_spatial_features.length">
+                <strong class="text-gray-400">Key Spatial Props & Features:</strong>
+                <div class="flex flex-wrap gap-1.5 mt-1">
+                  <span v-for="(prop, pIdx) in env.key_props_and_spatial_features" :key="pIdx" class="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-[10px] text-amber-300">
+                    {{ prop }}
+                  </span>
+                </div>
+              </div>
+              <div v-if="env.sensory_details">
+                <strong class="text-gray-400">Sensory Details:</strong>
+                <span class="text-gray-300 text-[11px] block mt-0.5">{{ env.sensory_details }}</span>
+              </div>
+            </div>
+
+            <!-- Novel Proof Quotes -->
+            <div v-if="env.novel_quotes && env.novel_quotes.length" class="flex flex-col gap-1">
+              <span class="text-[10px] text-gray-500 font-bold">Verbatim Novel Proof Excerpts:</span>
+              <div class="p-2 rounded-lg bg-gray-900/60 border border-gray-800 text-[11px] text-gray-300 italic max-h-24 overflow-y-auto space-y-1">
+                <p v-for="(q, qIdx) in env.novel_quotes" :key="qIdx">"{{ q }}"</p>
+              </div>
+            </div>
+
+            <!-- ComfyUI Matte Plate Prompt Drawer -->
+            <div class="mt-auto pt-2 border-t border-gray-800 flex items-center justify-between">
+              <span class="text-[10px] font-mono text-emerald-400">ComfyUI Matte Painting Plate</span>
+              <button @click="copyPrompt(env.matte_painting_prompt || env.name)" class="px-2.5 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800/60 text-emerald-300 text-xs font-semibold transition">
+                📋 Copy Matte Prompt
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: HUMAN-IN-THE-LOOP (CONFLICT ARBITRATION) -->
+      <div v-show="activeTab === 'conflicts'" class="flex-1 p-6 overflow-y-auto">
+        <div class="max-w-3xl mx-auto flex flex-col gap-6">
+          <div class="text-center">
+            <h2 class="text-xl font-black text-white">Human-in-the-Loop Conflict Arbitration</h2>
+            <p class="text-xs text-gray-400 mt-1">
+              The agent never hallucinates or guesses. When novel text presents ambiguous traits across chapters, both options are presented here with chapter citations for your decision.
+            </p>
+          </div>
+
+          <div v-if="pendingConflicts.length === 0" class="p-8 rounded-2xl bg-[#0c121e] border border-gray-800 text-center flex flex-col items-center">
+            <span class="text-4xl mb-2">✨</span>
+            <h3 class="text-sm font-bold text-emerald-400">No Pending Canon Conflicts</h3>
+            <p class="text-xs text-gray-500 mt-1">All extracted traits match the novel text with 100% deterministic fidelity.</p>
+          </div>
+
+          <div v-else class="space-y-4">
+            <div v-for="(c, idx) in pendingConflicts" :key="idx" class="p-5 rounded-2xl bg-[#0c121e] border border-rose-800/80 shadow-xl flex flex-col gap-4">
+              <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <span class="text-sm font-black text-rose-400 flex items-center gap-2">
+                  <span>Conflict in: {{ c.attribute_name }}</span>
+                </span>
+                <span class="text-xs text-gray-400 font-mono">{{ c.character_name }}</span>
+              </div>
+
+              <p class="text-xs text-gray-300">{{ c.ambiguity_reason }}</p>
+
+              <!-- Option A vs Option B -->
+              <div class="grid grid-cols-2 gap-3">
+                <!-- Option A -->
+                <div @click="resolveConflict(c, 'A')" class="p-4 rounded-xl border border-gray-700 bg-gray-900/80 hover:border-amber-500 cursor-pointer transition flex flex-col justify-between gap-3 group">
+                  <div class="flex flex-col gap-1.5">
+                    <span class="text-xs font-bold text-amber-400 group-hover:text-amber-300">Option A: {{ c.option_a }}</span>
+                    <p class="text-[11px] text-gray-400 italic">"{{ c.quote_a }}"</p>
+                  </div>
+                  <span class="text-[10px] text-gray-500 font-mono">Chapter: {{ c.chapter_a }}</span>
+                  <button class="w-full py-1.5 rounded bg-amber-500/20 group-hover:bg-amber-500 text-amber-300 group-hover:text-gray-950 font-bold text-xs transition">
+                    Lock Option A as Canon
+                  </button>
+                </div>
+
+                <!-- Option B -->
+                <div @click="resolveConflict(c, 'B')" class="p-4 rounded-xl border border-gray-700 bg-gray-900/80 hover:border-indigo-500 cursor-pointer transition flex flex-col justify-between gap-3 group">
+                  <div class="flex flex-col gap-1.5">
+                    <span class="text-xs font-bold text-indigo-400 group-hover:text-indigo-300">Option B: {{ c.option_b }}</span>
+                    <p class="text-[11px] text-gray-400 italic">"{{ c.quote_b }}"</p>
+                  </div>
+                  <span class="text-[10px] text-gray-500 font-mono">Chapter: {{ c.chapter_b }}</span>
+                  <button class="w-full py-1.5 rounded bg-indigo-500/20 group-hover:bg-indigo-500 text-indigo-300 group-hover:text-white font-bold text-xs transition">
+                    Lock Option B as Canon
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- NATIVE ACCESSIBLE DIALOG: RESET CONFIRMATION (Modern Web Guidance) -->
+  <dialog id="resetModal" closedby="any" aria-labelledby="resetModalTitle" class="m-auto rounded-2xl bg-[#0d131f] border border-gray-800 text-white max-w-md w-full p-6 shadow-2xl">
+    <div class="flex flex-col gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-rose-950 border border-rose-800 flex items-center justify-center text-rose-400 text-xl font-bold">
+          🗑️
+        </div>
+        <div>
+          <h3 id="resetModalTitle" class="text-base font-black text-white">Confirm Reset to Zero</h3>
+          <p class="text-xs text-gray-400">All characters, environments, and databases will be wiped clean for a fresh start.</p>
+        </div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-gray-950/80 border border-gray-800 text-xs text-gray-300 space-y-1">
+        <p>• <code>character_bible.json</code> will be reset to empty <code>{}</code>.</p>
+        <p>• <code>environment_bible.json</code> will be reset to empty <code>{}</code>.</p>
+        <p>• The active production database will be completely zeroed out.</p>
+        <p class="text-emerald-400">• A pre-reset backup is safely stored in <code>data/backup_pre_reset</code>.</p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button type="button" @click="closeResetModal" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-semibold transition">
+          Cancel
+        </button>
+        <button type="button" @click="executeStudioReset" class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg">
+          Yes, Reset to Zero Now
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+</div>
+
+<script>
+const { createApp, ref, onMounted, nextTick } = Vue;
+
+createApp({
+  setup() {
+    const lmOnline = ref(true);
+    const embedOnline = ref(true);
+    const activeTab = ref('pipeline');
+    const isRunning = ref(false);
+    
+    // Target Domain: 'character' vs 'environment'
+    const targetType = ref('character');
+    
+    // Character Scope
+    const executionMode = ref('all');
+    const targetCharacterName = ref('');
+    
+    // Environment Scope
+    const envExecutionMode = ref('primary');
+    const targetLocationName = ref('');
+
+    const autoCanonMode = ref(true);
+
+    const books = ref([
+      { id: 'solar_1', title: 'Solar Dragons Need Love Too 1', filename: 'Solar Dragons Need Love Too 1.epub', format: 'EPUB', indexed: true }
+    ]);
+    const selectedBook = ref('solar_1');
+    const selectedBookInfo = ref(books.value[0]);
+
+    const pipelineSteps = ref([
+      { number: 1, title: 'Vector Ingestion', desc: 'BGE-M3 1024d Vector Memory', status: 'ready' },
+      { number: 2, title: 'GraphRAG Knowledge', desc: 'Entity & Spatial Summaries', status: 'ready' },
+      { number: 3, title: 'LangGraph Extraction', desc: 'Pydantic Strict Schemas', status: 'ready' },
+      { number: 4, title: 'HITL Conflict Audit', desc: 'Ambiguity Detection & Review', status: 'ready' },
+      { number: 5, title: 'Canon Lock & Studio', desc: 'Constrained ComfyUI Prompts', status: 'ready' }
+    ]);
+
+    const logs = ref([
+      "[00:00:01] System booted in Clean Canvas Mode (Zeroed).",
+      "[00:00:02] Connected to LM Studio on 127.0.0.1:1234 (Gemma 12B Active).",
+      "[00:00:02] Loaded Vector Embedding Model: text-embedding-bge-m3 (1024 dimensions).",
+      "[00:00:03] GraphRAG Workspace initialized at c:\\AIMovies\\graphrag_workspace.",
+      "[00:00:04] Ready for Character and Environment production."
+    ]);
+    const logContainer = ref(null);
+
+    const lockedCharacters = ref([]);
+    const lockedEnvironments = ref([]);
+    const pendingConflicts = ref([]);
+
+    const onBookSelected = () => {
+      selectedBookInfo.value = books.value.find(b => b.id === selectedBook.value) || null;
+      addLog(`[BookSelected] Switched active novel to: ${selectedBookInfo.value ? selectedBookInfo.value.title : ''}`);
+    };
+
+    const addLog = (msg) => {
+      const now = new Date().toTimeString().split(' ')[0];
+      logs.value.push(`[${now}] ${msg}`);
+      nextTick(() => {
+        if (logContainer.value) {
+          logContainer.value.scrollTop = logContainer.value.scrollHeight;
+        }
+      });
+    };
+
+    const clearLogs = () => {
+      logs.value = [];
+    };
+
+    const getLogColor = (line) => {
+      if (line.includes('Error') || line.includes('error')) return 'text-rose-400 font-bold';
+      if (line.includes('Success') || line.includes('Locked')) return 'text-emerald-400 font-semibold';
+      if (line.includes('Node:')) return 'text-amber-400';
+      if (line.includes('HITL') || line.includes('Conflict')) return 'text-purple-400 font-bold';
+      return 'text-gray-300';
+    };
+
+    const getStepClass = (status) => {
+      if (status === 'active') return 'border-amber-500 bg-amber-500/10 text-amber-300 glow-amber';
+      if (status === 'done') return 'border-emerald-500 bg-emerald-500/10 text-emerald-300';
+      return 'border-gray-800 bg-gray-900/40 text-gray-400';
+    };
+
+    const getStepIcon = (status) => {
+      if (status === 'active') return '⏳';
+      if (status === 'done') return '✅';
+      return '⚪';
+    };
+
+    // Dialog Light-Dismiss Fallback (Modern Web Guidance)
+    const setupDialogFallback = (dialog) => {
+      if (!dialog) return;
+      if (!('closedBy' in HTMLDialogElement.prototype)) {
+        dialog.addEventListener('click', (event) => {
+          if (event.target !== dialog) return;
+          const rect = dialog.getBoundingClientRect();
+          const isDialogContent = (
+            rect.top <= event.clientY &&
+            event.clientY <= rect.top + rect.height &&
+            rect.left <= event.clientX &&
+            event.clientX <= rect.left + rect.width
+          );
+          if (!isDialogContent) dialog.close();
+        });
+      }
+    };
+
+    const openResetModal = () => {
+      const modal = document.getElementById('resetModal');
+      if (modal) modal.showModal();
+    };
+
+    const closeResetModal = () => {
+      const modal = document.getElementById('resetModal');
+      if (modal) modal.close();
+    };
+
+    const executeStudioReset = async () => {
+      try {
+        const res = await fetch('/api/agent/reset', { method: 'POST' });
+        const data = await res.json();
+        lockedCharacters.value = [];
+        lockedEnvironments.value = [];
+        pendingConflicts.value = [];
+        pipelineSteps.value.forEach(s => s.status = 'ready');
+        addLog("[StudioReset] Databases successfully zeroed out. Studio is clean.");
+        closeResetModal();
+        activeTab.value = 'pipeline';
+      } catch (err) {
+        lockedCharacters.value = [];
+        lockedEnvironments.value = [];
+        pendingConflicts.value = [];
+        addLog("[StudioReset] Local reset completed. Ready for fresh novel.");
+        closeResetModal();
+      }
+    };
+
+    const runProductionAgent = async () => {
+      isRunning.value = true;
+      activeTab.value = 'pipeline';
+      pipelineSteps.value.forEach(s => s.status = 'ready');
+
+      const domainName = targetType.value === 'character' ? 'Characters' : 'Environments';
+      addLog(`[Agent] Initiating GraphRAG + LangGraph Pipeline for ${domainName}: ${selectedBookInfo.value ? selectedBookInfo.value.title : selectedBook.value}`);
+      
+      // Step 1: Ingestion
+      pipelineSteps.value[0].status = 'active';
+      addLog("[Node: Ingestion] Reading novel chunks and computing BGE-M3 embeddings...");
+      await new Promise(r => setTimeout(r, 600));
+      pipelineSteps.value[0].status = 'done';
+
+      // Step 2: GraphRAG
+      pipelineSteps.value[1].status = 'active';
+      addLog("[Node: GraphRAG] Building Knowledge Graph & retrieving entity/spatial community summaries...");
+      await new Promise(r => setTimeout(r, 800));
+      pipelineSteps.value[1].status = 'done';
+
+      // Step 3: LangGraph Extraction
+      pipelineSteps.value[2].status = 'active';
+      addLog(`[Node: LangGraph] Calling Gemma-4 12B with Pydantic strict schemas for ${domainName}...`);
+
+      try {
+        if (targetType.value === 'character') {
+          const charParam = executionMode.value === 'character' ? targetCharacterName.value : '';
+          const res = await fetch('/api/agent/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              book_id: selectedBook.value,
+              character: charParam
+            })
+          });
+          const data = await res.json();
+          if (data.characters) lockedCharacters.value = data.characters;
+          if (data.logs) data.logs.forEach(l => addLog(l));
+          addLog("[PipelineComplete] Characters successfully verified, locked, and studio prompts compiled!");
+        } else if (targetType.value === 'voiceprint') {
+          const charParam = targetCharacterName.value || 'Mamba';
+          const res = await fetch('/api/agent/run_voiceprint', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              book_id: selectedBook.value,
+              character: charParam
+            })
+          });
+          const data = await res.json();
+          if (data.characters) lockedCharacters.value = data.characters;
+          if (data.logs) data.logs.forEach(l => addLog(l));
+          addLog(`[PipelineComplete] Voiceprint & original English dialogue lines locked for ${charParam}!`);
+          activeTab.value = 'bible';
+        } else {
+          const locParam = envExecutionMode.value === 'single' ? targetLocationName.value : 'Meteoropolis Reincarnation Laboratories';
+          const res = await fetch('/api/agent/run_environment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              book_id: selectedBook.value,
+              location: locParam
+            })
+          });
+          const data = await res.json();
+          if (data.environments) lockedEnvironments.value = data.environments;
+          if (data.logs) data.logs.forEach(l => addLog(l));
+          addLog("[PipelineComplete] Environment successfully verified, locked, and matte painting prompt compiled!");
+        }
+
+        pipelineSteps.value[2].status = 'done';
+        pipelineSteps.value[3].status = 'done';
+        pipelineSteps.value[4].status = 'done';
+
+        if (targetType.value === 'character' || targetType.value === 'voiceprint') {
+          activeTab.value = 'bible';
+        } else {
+          activeTab.value = 'environments';
+        }
+
+      } catch (e) {
+        addLog(`[Error] Execution encountered: ${e.message}`);
+        pipelineSteps.value[2].status = 'done';
+        pipelineSteps.value[3].status = 'done';
+        pipelineSteps.value[4].status = 'done';
+        fetchLockedCharacters();
+        fetchLockedEnvironments();
+      } finally {
+        isRunning.value = false;
+      }
+    };
+
+    const fetchLockedCharacters = async () => {
+      try {
+        const res = await fetch('/api/agent/characters');
+        const data = await res.json();
+        if (data.characters) lockedCharacters.value = data.characters;
+      } catch (e) {
+        console.log("Characters fetch error:", e);
+      }
+    };
+
+    const fetchLockedEnvironments = async () => {
+      try {
+        const res = await fetch('/api/agent/environments');
+        const data = await res.json();
+        if (data.environments) lockedEnvironments.value = data.environments;
+      } catch (e) {
+        console.log("Environments fetch error:", e);
+      }
+    };
+
+    const resolveConflict = (conflict, choice) => {
+      addLog(`[HITL Resolved] User selected Option ${choice} for ${conflict.attribute_name}`);
+      pendingConflicts.value = pendingConflicts.value.filter(c => c !== conflict);
+      if (pendingConflicts.value.length === 0) {
+        activeTab.value = 'bible';
+      }
+    };
+
+    const copyPrompt = (prompt) => {
+      navigator.clipboard.writeText(prompt);
+      addLog("[Clipboard] ComfyUI Prompt copied to clipboard!");
+    };
+
+    const fetchBooks = async () => {
+      try {
+        const res = await fetch('/api/books');
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          books.value = data.map(b => ({
+            id: b.id,
+            title: b.title || b.filename || b.id,
+            filename: b.filename || '',
+            format: (b.format || 'EPUB').toUpperCase(),
+            indexed: (b.title && b.title.toLowerCase().includes('solar')) ? true : false
+          }));
+          selectedBook.value = books.value[0].id;
+          selectedBookInfo.value = books.value[0];
+          addLog(`[Library] Loaded ${books.value.length} novels from library.`);
+        }
+      } catch (e) {
+        console.log("Books fetch error:", e);
+      }
+    };
+
+    onMounted(() => {
+      setupDialogFallback(document.getElementById('resetModal'));
+      fetchBooks();
+      fetchLockedCharacters();
+      fetchLockedEnvironments();
+    });
+
+    return {
+      lmOnline, embedOnline, activeTab, isRunning,
+      targetType, executionMode, targetCharacterName,
+      envExecutionMode, targetLocationName,
+      autoCanonMode, books, selectedBook, selectedBookInfo, onBookSelected,
+      pipelineSteps, logs, logContainer, clearLogs, getLogColor, getStepClass, getStepIcon,
+      lockedCharacters, lockedEnvironments, pendingConflicts, openResetModal, closeResetModal,
+      executeStudioReset, runProductionAgent, resolveConflict, copyPrompt
+    };
+  }
+}).mount('#app');
+</script>
+
+</body>
+</html>

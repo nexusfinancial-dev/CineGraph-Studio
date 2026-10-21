@@ -1,0 +1,70 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Temporary scratch & experiments
+scratch/
+tmp/
+*.log
+
+# Studio Data & Copyrighted Media
+data/backup_pre_reset/
+data/books/*
+!data/books/.gitkeep
+data/asset_bible.json
+data/bible_*.json
+data/storyboard_*.json
+data/reading_history.json
+data/gemini_config.json
+
+# GraphRAG Workspaces & Inputs
+graphrag_workspace/.env
+graphrag_workspace/cache/
+graphrag_workspace/output/
+graphrag_workspace/input/*
+!graphrag_workspace/input/.gitkeep
