@@ -113,7 +113,7 @@ CineGraph Studio AI features a dedicated, zero-latency director dashboard served
 * **Audio Script & Narration View:** Filterable tabs for spoken dialogue, voice-overs, and narrator chunks with performance directives.
 * **Complete Scenes Breakdown View:** Full Hollywood scene cards with sluglines, actor blocking, dialogue sequences, foley soundscapes, and ComfyUI keyframe cards.
 * **Micro-Scenes & Video Takes View (6s-15s):** Take-by-take breakdown with audio timeline bars (2 words/sec), camera moves, and ready-to-render MiniMax H3 / Kling prompts.
-* **Dynamic Book Library:** Seamlessly scans, reads, and processes any EPUB or TXT file placed in `data/books/`.
+* **Dynamic Book Library:** Seamlessly scans, reads, and processes any EPUB or TXT file placed in `data/books/` or uploaded via the **Upload Novel** button.
 * **Zero Canvas Reset:** Reset databases to a clean slate with a single click.
 
 ---
@@ -144,6 +144,11 @@ On Windows, simply double-click `Run_Studio.bat` or run:
 python -m uvicorn server:app --host 127.0.0.1 --port 8555
 ```
 Open your browser at **`http://127.0.0.1:8555/agent`**.
+
+### 4. Load Your Novel
+You can load literary manuscripts in two simple ways:
+* **One-Click Web Upload:** Click the **`Upload Novel (EPUB / TXT)`** button in the studio sidebar to select any book from your computer.
+* **Direct Folder Drag & Drop:** Copy your `.epub` or `.txt` files directly into the `data/books/` directory (automatically scanned on launch).
 
 ---
 
