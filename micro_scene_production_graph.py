@@ -72,6 +72,8 @@ class MicroSceneBible(BaseModel):
 
 class MicroSceneAgentState(TypedDict):
     scene_bible_path: str
+    micro_bible_path: Optional[str]
+    novel_title: Optional[str]
     raw_scenes: List[Dict[str, Any]]
     micro_shots: List[Dict[str, Any]]
     min_duration: float
@@ -527,8 +529,9 @@ def load_master_scenes_node(state: MicroSceneAgentState) -> Dict[str, Any]:
         data = json.load(f)
 
     scenes = data.get("scenes", [])
+    novel_title = state.get("novel_title") or data.get("novel_title") or "Novel Adaptation"
     print(f"[Node: LoadMasterScenes] Loaded {len(scenes)} master scenes from {os.path.basename(bible_path)}")
-    return {"raw_scenes": scenes}
+    return {"raw_scenes": scenes, "novel_title": novel_title}
 
 
 def decompose_into_shots_node(state: MicroSceneAgentState) -> Dict[str, Any]:
@@ -555,8 +558,11 @@ def lock_micro_scenes_bible_node(state: MicroSceneAgentState) -> Dict[str, Any]:
     secs = int(total_seconds % 60)
     formatted_runtime = f"{mins}m {secs:02d}s"
 
+    target_path = state.get("micro_bible_path") or MICRO_SCENES_BIBLE_PATH
+    novel_title = state.get("novel_title") or "Novel Adaptation"
+
     bible = {
-        "novel_title": "Solar Dragons Need Love Too 1",
+        "novel_title": novel_title,
         "pacing_standard": "2.0 words per second",
         "duration_constraint": "6.0s - 15.0s per take",
         "total_master_scenes": len(set(s.get("scene_number") for s in shots_raw)),
@@ -566,11 +572,11 @@ def lock_micro_scenes_bible_node(state: MicroSceneAgentState) -> Dict[str, Any]:
         "shots": shots_raw
     }
 
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(MICRO_SCENES_BIBLE_PATH, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(os.path.abspath(target_path)), exist_ok=True)
+    with open(target_path, "w", encoding="utf-8") as f:
         json.dump(bible, f, indent=2, ensure_ascii=False)
 
-    print(f"[Node: LockMicroScenes] Saved {len(shots_raw)} takes to {MICRO_SCENES_BIBLE_PATH} (Total runtime: {formatted_runtime})")
+    print(f"[Node: LockMicroScenes] Saved {len(shots_raw)} takes to {target_path} (Total runtime: {formatted_runtime})")
     return {"is_locked": True}
 
 
@@ -590,9 +596,10 @@ def build_micro_scene_graph():
     return workflow.compile()
 
 
-def load_micro_scenes_bible() -> Dict[str, Any]:
+def load_micro_scenes_bible(bible_path: Optional[str] = None) -> Dict[str, Any]:
     """Load the locked micro-scenes bible."""
-    if not os.path.exists(MICRO_SCENES_BIBLE_PATH):
+    target_path = bible_path or MICRO_SCENES_BIBLE_PATH
+    if not os.path.exists(target_path):
         return {
             "novel_title": "",
             "pacing_standard": "2.0 words per second",
@@ -603,7 +610,7 @@ def load_micro_scenes_bible() -> Dict[str, Any]:
             "total_runtime_formatted": "0m 00s",
             "shots": []
         }
-    with open(MICRO_SCENES_BIBLE_PATH, "r", encoding="utf-8") as f:
+    with open(target_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 

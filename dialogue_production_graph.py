@@ -38,7 +38,7 @@ llm = ChatOpenAI(
 
 class SpokenDialogueItem(BaseModel):
     id: str = Field(default_factory=lambda: f"dlg_{uuid.uuid4().hex[:6]}")
-    speaker: str = Field(description="Name of the character speaking aloud (e.g. Mamba, Brock Clayton, Blossom)")
+    speaker: str = Field(description="Name of the character speaking aloud")
     addressed_to: str = Field(default="Listener", description="Character being addressed or spoken to")
     line_en: str = Field(description="Exact verbatim spoken dialogue line from the novel in original English")
     performance_instruction: str = Field(
@@ -50,7 +50,7 @@ class SpokenDialogueItem(BaseModel):
 
 class VoiceOverItem(BaseModel):
     id: str = Field(default_factory=lambda: f"vo_{uuid.uuid4().hex[:6]}")
-    speaker: str = Field(description="POV character whose internal thoughts or memories are heard (e.g. Brock Clayton)")
+    speaker: str = Field(description="POV character whose internal thoughts or memories are heard")
     line_en: str = Field(description="Exact verbatim inner monologue or thought line in original English")
     performance_instruction: str = Field(
         description="Line-by-line performance tag: [Instruction: Intimate interior monologue, dry close-mic, reflective whisper, zero reverb]"
@@ -132,40 +132,67 @@ def extract_candidate_passages(txt_path: str, target_char: Optional[str] = None,
 
     return candidates
 
-def infer_speaker_and_addressee(p: str, default_protagonist: str = "Brock Clayton") -> tuple:
-    """Intelligently infer speaker and addressee from novel paragraph narrative markers."""
-    p_low = p.lower()
+def generate_dynamic_directive(quote: str, paragraph: str, speaker: str) -> tuple:
+    """Generate dynamic TTS / acting instruction and emotion based on textual cues."""
+    p_low = paragraph.lower()
     
-    if "mamba" in p_low:
-        if any(v in p_low for v in ["mamba said", "mamba purred", "mamba chuckled", "mamba smiled", "mamba hissed", "said mamba"]):
-            return "Mamba", default_protagonist
-        elif any(v in p_low for v in ["i said", "i asked", "i replied", "i called"]):
-            return default_protagonist, "Mamba"
-        return "Mamba", default_protagonist
+    if any(w in p_low for w in ["shouted", "screamed", "yelled", "barked"]) or quote.endswith("!"):
+        instr = "[Instruction: High-energy dramatic projection, sharp dynamic emphasis, clear studio mic capture]"
+        emotion = "Intense, urgent, assertive"
+    elif any(w in p_low for w in ["whispered", "breathed", "murmured"]) or "..." in quote:
+        instr = "[Instruction: Soft intimate whisper, subtle vocal proximity, dry close-mic recording, zero room reverb]"
+        emotion = "Intimate, reflective, quiet"
+    elif any(w in p_low for w in ["laughed", "chuckled", "grinned", "smiled"]):
+        instr = "[Instruction: Amused conversational tone with subtle vocal warmth, relaxed cadence]"
+        emotion = "Amused, playful, warm"
+    elif any(w in p_low for w in ["cried", "sobbed", "choked"]):
+        instr = "[Instruction: Vulnerable emotional delivery with subtle vocal break, sincere cadence]"
+        emotion = "Vulnerable, sorrowful"
+    elif any(w in p_low for w in ["asked", "inquired"]) or quote.endswith("?"):
+        instr = "[Instruction: Curious inquisitive delivery, slightly raised terminal pitch, natural timing]"
+        emotion = "Inquisitive, questioning"
+    elif any(w in p_low for w in ["coldly", "snapped", "hissed"]):
+        instr = "[Instruction: Controlled tense delivery, crisp low-pitch articulation, dry studio recording]"
+        emotion = "Firm, guarded, stern"
+    else:
+        instr = "[Instruction: Grounded cinematic dialogue delivery, clear speech articulation, natural room acoustic proximity]"
+        emotion = "Conversational, grounded"
 
-    if "blossom" in p_low:
-        if any(v in p_low for v in ["blossom said", "blossom squeaked", "blossom chimed", "blossom pouted"]):
-            return "Blossom", default_protagonist
-        elif any(v in p_low for v in ["i said", "i asked", "i replied"]):
-            return default_protagonist, "Blossom"
-        return "Blossom", default_protagonist
+    return instr, emotion
 
-    if any(k in p_low for k in ["councilman", "dr. luna", "the man said", "he said"]):
-        return "Doctor / Councilman", default_protagonist
+def infer_speaker_and_addressee(p: str, known_characters: Optional[List[str]] = None, default_protagonist: Optional[str] = None) -> tuple:
+    """Intelligently infer speaker and addressee dynamically from novel text without hardcoding."""
+    p_low = p.lower()
+    protagonist = default_protagonist or "Protagonist"
+    characters = known_characters or []
 
-    if any(v in p_low for v in ["i called", "i shouted", "i asked", "i said", "i muttered"]):
-        return default_protagonist, "Listener"
+    speech_verbs = ["said", "asked", "replied", "shouted", "whispered", "called", "chuckled", "smiled", "exclaimed", "muttered"]
+    
+    for ch in characters:
+        ch_low = ch.lower()
+        if ch_low in p_low:
+            for v in speech_verbs:
+                if f"{ch_low} {v}" in p_low or f"{v} {ch_low}" in p_low or f"{ch_low}," in p_low:
+                    return ch, protagonist
 
-    if any(v in p_low for v in ["she said", "she purred", "she chuckled"]):
-        return "Female Companion", default_protagonist
+    if any(f"i {v}" in p_low for v in speech_verbs):
+        other_chars = [c for c in characters if c.lower() != protagonist.lower() and c.lower() in p_low]
+        addressee = other_chars[0] if other_chars else "Listener"
+        return protagonist, addressee
 
-    if any(v in p_low for v in ["he said", "he asked", "he barked"]):
-        return "Male Companion", default_protagonist
+    for ch in characters:
+        if ch.lower() in p_low:
+            return ch, protagonist
 
-    return default_protagonist, "Listener"
+    if any(f"she {v}" in p_low for v in speech_verbs):
+        return "Female Speaker", protagonist
+    if any(f"he {v}" in p_low for v in speech_verbs):
+        return "Male Speaker", protagonist
 
-def parse_deterministic_script(paragraphs: List[str], target_char: Optional[str] = None, scope: str = "all") -> AudioScriptBible:
-    """Deterministic, high-speed parser extracting dialogues, voiceovers, and narrative exposition."""
+    return protagonist, "Listener"
+
+def parse_deterministic_script(paragraphs: List[str], target_char: Optional[str] = None, scope: str = "all", known_characters: Optional[List[str]] = None, default_protagonist: Optional[str] = None) -> AudioScriptBible:
+    """Deterministic, high-speed parser extracting dialogues, voiceovers, and narrative exposition dynamically."""
     bible = AudioScriptBible()
     
     dialogue_regex = re.compile(r'"([^"]{5,300})"')
@@ -174,10 +201,9 @@ def parse_deterministic_script(paragraphs: List[str], target_char: Optional[str]
     char_filter = target_char.lower() if target_char else ""
     
     for p in paragraphs:
-        # Check for Spoken Dialogues
         quotes = dialogue_regex.findall(p)
         if quotes and scope in ["all", "dialogue"]:
-            speaker, addressed_to = infer_speaker_and_addressee(p)
+            speaker, addressed_to = infer_speaker_and_addressee(p, known_characters=known_characters, default_protagonist=default_protagonist)
             
             if char_filter and char_filter not in speaker.lower() and char_filter not in p.lower():
                 continue
@@ -185,21 +211,7 @@ def parse_deterministic_script(paragraphs: List[str], target_char: Optional[str]
             for q in quotes:
                 clean_q = q.strip()
                 if len(clean_q.split()) >= 3:
-                    if speaker == "Mamba":
-                        instr = "[Instruction: Sultry contralto, teasing smile, playful dominance with lingering sibilant 's', dry close-mic studio recording, zero reverb]"
-                        emotion = "Playful, teasing, confident"
-                    elif speaker == "Blossom":
-                        instr = "[Instruction: Bright crystalline soprano, airy fluttering cadence, spirited earnest tone, clean close-mic]"
-                        emotion = "Earnest, vibrant, eager"
-                    elif speaker == "Brock Clayton":
-                        instr = "[Instruction: Conversational baritone, grounded male delivery, slightly bemused or dryly sarcastic, natural acoustic proximity]"
-                        emotion = "Bewildered, conversational"
-                    elif "Doctor" in speaker or "Councilman" in speaker:
-                        instr = "[Instruction: Theatrical lower baritone, eccentric welcoming warmth, crisp close-mic studio capture]"
-                        emotion = "Authoritative, welcoming, eccentric"
-                    else:
-                        instr = "[Instruction: Clear cinematic dialogue delivery, character-appropriate vocal texture, dry studio capture]"
-                        emotion = "Conversational"
+                    instr, emotion = generate_dynamic_directive(clean_q, p, speaker)
 
                     bible.dialogues.append(SpokenDialogueItem(
                         speaker=speaker,
@@ -217,8 +229,9 @@ def parse_deterministic_script(paragraphs: List[str], target_char: Optional[str]
                 sent_str = sent.strip()
                 if any(kw in sent_str.lower() for kw in inner_thought_keywords) and len(sent_str) > 20:
                     clean_vo = sent_str.replace('"', '').strip()
+                    vo_speaker = target_char or default_protagonist or (known_characters[0] if (known_characters and len(known_characters) > 0) else "Protagonist")
                     bible.voice_overs.append(VoiceOverItem(
-                        speaker=target_char if target_char else "Brock Clayton",
+                        speaker=vo_speaker,
                         line_en=clean_vo,
                         performance_instruction="[Instruction: Intimate internal monologue, dry close-mic, reflective whisper, zero reverb]",
                         context_quote=p[:220] + ("..." if len(p) > 220 else ""),
@@ -340,11 +353,12 @@ Return JSON with this exact schema:
 
 SCRIPT_BIBLE_PATH = os.path.join(BASE_DIR, "data", "script_bible.json")
 
-def load_script_bible() -> Dict[str, Any]:
+def load_script_bible(bible_path: Optional[str] = None) -> Dict[str, Any]:
     """Load script bible from disk."""
-    if os.path.exists(SCRIPT_BIBLE_PATH):
+    path = bible_path or SCRIPT_BIBLE_PATH
+    if os.path.exists(path):
         try:
-            with open(SCRIPT_BIBLE_PATH, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             pass
@@ -355,15 +369,25 @@ def load_script_bible() -> Dict[str, Any]:
         "narrator_voiceprint": NarratorVoiceprint().model_dump()
     }
 
-def save_script_bible(bible: Dict[str, Any]):
+def save_script_bible(bible: Dict[str, Any], bible_path: Optional[str] = None):
     """Persist script bible to disk with atomic safety."""
-    os.makedirs(os.path.dirname(SCRIPT_BIBLE_PATH), exist_ok=True)
-    with open(SCRIPT_BIBLE_PATH, "w", encoding="utf-8") as f:
+    path = bible_path or SCRIPT_BIBLE_PATH
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(bible, f, ensure_ascii=False, indent=2)
 
-def merge_and_lock_script(extracted: AudioScriptBible):
-    """Merge extracted items into data/script_bible.json, avoiding duplicate lines."""
-    current = load_script_bible()
+    # Also sync to default active script bible
+    default_active = os.path.join(BASE_DIR, "data", "script_bible.json")
+    if os.path.abspath(path) != os.path.abspath(default_active):
+        try:
+            with open(default_active, "w", encoding="utf-8") as f:
+                json.dump(bible, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+def merge_and_lock_script(extracted: AudioScriptBible, bible_path: Optional[str] = None):
+    """Merge extracted items into script bible, avoiding duplicate lines."""
+    current = load_script_bible(bible_path)
     
     existing_dlg_lines = {d.get("line_en", "").strip().lower() for d in current.get("dialogues", [])}
     for item in extracted.dialogues:
@@ -386,7 +410,7 @@ def merge_and_lock_script(extracted: AudioScriptBible):
     if not current.get("narrator_voiceprint"):
         current["narrator_voiceprint"] = extracted.narrator_voiceprint.model_dump()
 
-    save_script_bible(current)
+    save_script_bible(current, bible_path)
     return current
 
 # ==========================================
@@ -405,10 +429,25 @@ def extract_script_node(state: ScriptAgentState) -> Dict[str, Any]:
     passages = state.get("raw_passages", [])
     target_char = state.get("target_character")
     scope = state.get("scope_filter", "all")
+    txt_path = state.get("novel_text_path", "")
     print(f"[Node: ExtractScript] Processing scope='{scope}' with character='{target_char}'...", flush=True)
+
+    # Discover characters dynamically from the actual novel
+    try:
+        from novel_production_graph import discover_novel_characters
+        known_chars = discover_novel_characters(txt_path) if txt_path else []
+    except Exception:
+        known_chars = []
+    protagonist = known_chars[0] if known_chars else "Protagonist"
     
     # Run high-speed deterministic narrative extraction
-    script_bible = parse_deterministic_script(passages, target_char, scope)
+    script_bible = parse_deterministic_script(
+        passages,
+        target_char,
+        scope,
+        known_characters=known_chars,
+        default_protagonist=protagonist
+    )
     print(
         f"[ExtractScript] Extracted {len(script_bible.dialogues)} Dialogues, "
         f"{len(script_bible.voice_overs)} Voice-Overs, "

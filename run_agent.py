@@ -9,9 +9,10 @@ import sys
 import json
 import argparse
 from pathlib import Path
+from typing import Optional, List, Dict, Any
 
 # Import pipeline components directly
-from novel_production_graph import build_production_graph, ProductionAgentState
+from novel_production_graph import build_production_graph, ProductionAgentState, discover_novel_characters
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -28,10 +29,11 @@ def resolve_novel_text(book_input: str) -> str:
             r"C:\Users\MiroAI\Downloads",
             r"E:\Ero\epub"
         ]
+        clean_input = book_input.replace("__epub", "").strip().lower()
         for dir_path in search_dirs:
             if os.path.exists(dir_path):
                 for f in os.listdir(dir_path):
-                    if book_input.lower() in f.lower() and f.endswith(('.epub', '.txt')):
+                    if clean_input in f.lower() and f.endswith(('.epub', '.txt')):
                         found = os.path.join(dir_path, f)
                         break
             if found:
@@ -39,8 +41,7 @@ def resolve_novel_text(book_input: str) -> str:
         book_path = found
 
     if not book_path or not os.path.exists(book_path):
-        print(f"[Error] Could not find novel: '{book_input}'. Please specify the exact file path.", flush=True)
-        sys.exit(1)
+        raise FileNotFoundError(f"Could not find novel: '{book_input}'. Please verify the book path or filename in data/books/.")
 
     print(f"[Runner] Located Novel: {book_path}", flush=True)
 
@@ -74,7 +75,7 @@ def resolve_novel_text(book_input: str) -> str:
 
     return clean_txt_path
 
-def run_for_character(app, char_name: str, txt_path: str):
+def run_for_character(app, char_name: str, txt_path: str, bible_path: Optional[str] = None):
     """Run the LangGraph workflow for a single character."""
     print(f"\n{'='*65}", flush=True)
     print(f" PROCESSING CANONICAL IDENTITY: {char_name.upper()}", flush=True)
@@ -83,6 +84,7 @@ def run_for_character(app, char_name: str, txt_path: str):
     state: ProductionAgentState = {
         "character_name": char_name,
         "novel_text_path": txt_path,
+        "bible_path": bible_path,
         "retrieved_passages": [],
         "canonical_identity": None,
         "wardrobes": [],
@@ -93,7 +95,7 @@ def run_for_character(app, char_name: str, txt_path: str):
         "outfit_prompts": []
     }
     
-    config = {"configurable": {"thread_id": f"cli_run_{char_name.lower()}"}}
+    config = {"configurable": {"thread_id": f"cli_run_{char_name.lower().replace(' ', '_')}"}}
     result = app.invoke(state, config=config)
     
     identity = result.get("canonical_identity", {})
@@ -124,9 +126,10 @@ def main():
     if args.character:
         run_for_character(app, args.character, txt_path)
     else:
-        default_chars = ["Mamba", "Blossom", "Pinky Peach", "Brock Clayton"]
-        print(f"[Runner] No single character specified. Running for core cast: {default_chars}", flush=True)
-        for ch in default_chars:
+        # Dynamically discover the actual characters of this novel
+        discovered_chars = discover_novel_characters(txt_path)
+        print(f"[Runner] Discovered {len(discovered_chars)} novel characters: {discovered_chars}", flush=True)
+        for ch in discovered_chars:
             run_for_character(app, ch, txt_path)
 
     print("\n[Done] All characters audited, resolved, and locked in character_bible.json!", flush=True)

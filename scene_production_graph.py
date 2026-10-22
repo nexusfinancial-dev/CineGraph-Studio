@@ -76,6 +76,7 @@ class SceneAgentState(TypedDict):
     raw_scene_blocks: List[Dict[str, Any]]
     extracted_scenes: List[Dict[str, Any]]
     is_locked: bool
+    bible_path: Optional[str]
 
 # ==========================================
 # 2. Narrative Segmentation Logic
@@ -102,9 +103,10 @@ def segment_novel_into_scenes(txt_path: str, max_scenes: int = 12) -> List[Dict[
     # Filter out TOC and copyright
     story_paragraphs = []
     found_start = False
+    start_markers = ["chapter 1", "chapter one", "prologue", "part 1", "part one", "act 1"]
     for p in raw_paragraphs:
         p_low = p.lower()
-        if "light returned to me" in p_low or "chapter 1" in p_low or "welcome to meteoropolis" in p_low:
+        if any(m in p_low for m in start_markers):
             found_start = True
         if found_start:
             if "oceanofpdf" not in p_low and "all rights reserved" not in p_low:
@@ -126,74 +128,74 @@ def segment_novel_into_scenes(txt_path: str, max_scenes: int = 12) -> List[Dict[
 
     return scene_blocks
 
-def infer_scene_metadata(scene_num: int, paragraphs: List[str]) -> CompleteScene:
-    """Analyze paragraphs and construct a rich, complete cinematic scene object."""
+def infer_scene_metadata(scene_num: int, paragraphs: List[str], known_characters: Optional[List[str]] = None, known_locations: Optional[List[str]] = None) -> CompleteScene:
+    """Analyze paragraphs and construct a rich, complete cinematic scene object dynamically."""
     full_block_text = "\n\n".join(paragraphs)
     text_low = full_block_text.lower()
+    characters = known_characters or []
+    locations_pool = known_locations or []
 
     # 1. Active Characters
     chars_present = []
-    if "brock" in text_low or " i " in text_low or "my " in text_low:
-        chars_present.append("Brock Clayton")
-    if "mamba" in text_low:
-        chars_present.append("Mamba")
-    if "blossom" in text_low:
-        chars_present.append("Blossom")
-    if any(k in text_low for k in ["councilman", "doctor", "dr. luna", "white eyes", "bald dome", "pointed ears"]):
-        chars_present.append("Doctor / Councilman White")
-    if "pinky" in text_low:
-        chars_present.append("Pinky Peach")
+    for ch in characters:
+        if ch.lower() in text_low:
+            chars_present.append(ch)
     if not chars_present:
-        chars_present = ["Brock Clayton"]
+        chars_present = [characters[0]] if characters else ["Protagonist"]
 
     # 2. Location & Slugline
-    if any(k in text_low for k in ["pod", "containment", "glass", "lab", "laboratory", "machinery", "silicon", "tubes"]):
-        location = "Meteoropolis Reincarnation Laboratories"
-        slugline = f"INT. REINCARNATION POD CHAMBER - METEOROPOLIS LABORATORIES - DAWN"
-        time_of_day = "DAWN"
-        soundscape = "Low mechanical hum of idling pod generators, rhythmic pneumatic valve releases, echoing footsteps on steel floor grating"
-    elif any(k in text_low for k in ["penthouse", "living room", "couch", "balcony", "apartment", "sofa", "kitchen"]):
-        location = "Brock's Luxury Penthouse Apartment"
-        slugline = f"INT. BROCK'S PENTHOUSE APARTMENT - LIVING ROOM - MORNING"
-        time_of_day = "MORNING"
-        soundscape = "Muffled ambient city drone through double-glazed panoramic windows, gentle acoustic breeze on balcony, soft rustle of silk cushions"
-    elif any(k in text_low for k in ["mall", "store", "shopping", "clothes", "dressing room"]):
-        location = "Meteoropolis Central Fashion Plaza"
-        slugline = f"INT. FASHION BOUTIQUE - DRESSING ROOM BAY - DAY"
-        time_of_day = "DAY"
-        soundscape = "Chiming electronic storefront chimes, bustling murmur of multi-species shoppers, neon light tube buzz"
-    elif any(k in text_low for k in ["skyline", "meteor", "city", "flying", "street", "exterior"]):
-        location = "Meteoropolis Skyline & Upper Tier"
-        slugline = f"EXT. METEOROPOLIS SKYLINE - HIGH ELEVATION - DUSK"
-        time_of_day = "DUSK"
-        soundscape = "Volumetric gusting winds, deep roaring wingbeats of golden dragons overhead, resonant pulse of airborne transit freighters"
+    location = None
+    for loc in locations_pool:
+        if any(w.lower() in text_low for w in loc.split() if len(w) > 3):
+            location = loc
+            break
+
+    if not location:
+        if any(k in text_low for k in ["room", "bedroom", "apartment", "couch", "bed", "desk", "laptop", "chair"]):
+            location = "Apartment Living Chamber"
+            slugline = f"INT. APARTMENT - DAY"
+            time_of_day = "DAY"
+            soundscape = "Subdued interior room acoustics, soft ambient room tone, faint distant street tone"
+        elif any(k in text_low for k in ["office", "studio", "building", "hall", "reception", "desk"]):
+            location = "Production Studio & Facility"
+            slugline = f"INT. FACILITY OFFICE - INTERIOR - DAY"
+            time_of_day = "DAY"
+            soundscape = "Commercial indoor tone, fluorescent ballast hum, muffled corridor footsteps"
+        elif any(k in text_low for k in ["street", "outside", "car", "city", "park", "sky"]):
+            location = "City Exterior & Streets"
+            slugline = f"EXT. CITY DISTRICT - DAY"
+            time_of_day = "DAY"
+            soundscape = "Dynamic outdoor ambiance, traffic murmur, open-air acoustic resonance"
+        else:
+            location = locations_pool[0] if locations_pool else "Primary Scene Setting"
+            slugline = f"INT. PRIMARY SCENE LOCATION - CONTINUOUS"
+            time_of_day = "DAY"
+            soundscape = "Natural room acoustics, subtle actor foley, ambient room tone"
     else:
-        location = "Meteoropolis Urban Sector"
-        slugline = f"INT. METEOROPOLIS RECEPTION CHAMBER - CONTINUOUS"
-        time_of_day = "DAY"
-        soundscape = "Atmospheric interior hum, subdued fluorescent lighting buzz, distant ventilation draft"
+        is_ext = any(w in location.lower() for w in ["exterior", "street", "skyline", "park", "outside"])
+        time_of_day = "NIGHT" if any(w in text_low for w in ["night", "dark", "evening", "midnight"]) else "DAY"
+        slugline = f"{'EXT.' if is_ext else 'INT.'} {location.upper()} - {time_of_day}"
+        soundscape = f"Immersive cinematic acoustic environment of {location}, authentic spatial reverb, natural foley"
 
     # 3. Dramatic Objective & Synopsis
-    if "pod" in text_low or "reincarnation" in text_low:
-        dramatic_objective = "Brock awakens inside a cryogenic medical pod with amnesia, grappling with physical disorientation and encountering his eccentric alien physician."
-        synopsis = (
-            "Brock Clayton regains consciousness inside an idling containment pod, suffocated by foggy rose-colored glass and amnesia. "
-            "Doctor White unbuckles him with a remote control, welcoming him to the alien megacity of Meteoropolis while Brock tries to determine if he has lost his sanity."
-        )
-    elif "mamba" in text_low:
-        dramatic_objective = "Playful morning dominance and territory banter between Brock and Mamba as they adapt to their cohabitation dynamics."
-        synopsis = (
-            "Mamba slithers into the living room with confident serpentine grace, teasing Brock over breakfast and asserting her affectionate dominance "
-            "while discussing the looming galactic council threats over Meteoropolis."
-        )
-    elif "blossom" in text_low:
-        dramatic_objective = "Blossom passionately asserts her adult independence and botanical identity after Brock misinterprets her youthful stature."
-        synopsis = (
-            "Blossom flares her petals in proud defiance when treated like a fragile sprout, displaying her botanical abilities and forging an earnest bond of trust with Brock."
-        )
+    narrative_sentences = []
+    for p in paragraphs:
+        if len(p) > 40 and not p.startswith('"') and not p.startswith('“'):
+            for s in p.split("."):
+                s_clean = s.strip()
+                if len(s_clean) > 20 and not s_clean.lower().startswith("chapter"):
+                    narrative_sentences.append(s_clean + ".")
+                    if len(narrative_sentences) >= 3:
+                        break
+        if len(narrative_sentences) >= 3:
+            break
+
+    if narrative_sentences:
+        dramatic_objective = f"Characters navigate key story developments: {narrative_sentences[0]}"
+        synopsis = " ".join(narrative_sentences[:2])
     else:
-        dramatic_objective = f"Exploration and exposition establishing the rules and dangers of Meteoropolis."
-        synopsis = f"The characters navigate an intense narrative sequence in {location}, contending with shifting allegiances and new discoveries."
+        dramatic_objective = f"Dramatic interaction and pivotal story progression in {location}."
+        synopsis = f"Characters navigate an unfolding sequence in {location}, contending with immediate narrative stakes."
 
     # 4. Action Beats
     action_beats = []
@@ -222,13 +224,11 @@ def infer_scene_metadata(scene_num: int, paragraphs: List[str]) -> CompleteScene
         quotes = dialogue_regex.findall(p)
         if quotes:
             p_low = p.lower()
-            speaker = "Brock Clayton"
-            if "mamba" in p_low:
-                speaker = "Mamba"
-            elif "blossom" in p_low:
-                speaker = "Blossom"
-            elif any(k in p_low for k in ["councilman", "doctor", "the man said", "he said"]):
-                speaker = "Doctor / Councilman White"
+            speaker = chars_present[0] if chars_present else (characters[0] if characters else "Protagonist")
+            for ch in (characters or chars_present):
+                if ch.lower() in p_low:
+                    speaker = ch
+                    break
 
             for q in quotes:
                 clean_q = q.strip()
@@ -246,7 +246,7 @@ def infer_scene_metadata(scene_num: int, paragraphs: List[str]) -> CompleteScene
                 sent_str = sent.strip()
                 if any(kw in sent_str.lower() for kw in inner_thought_keywords) and len(sent_str) > 20:
                     dialogue_flow.append(SceneDialogueBeat(
-                        speaker="Brock Clayton",
+                        speaker=chars_present[0] if chars_present else (characters[0] if characters else "POV Protagonist"),
                         line_en=sent_str.replace('"', '').strip(),
                         performance_instruction="[Instruction: Intimate interior monologue, dry close-mic, reflective whisper, zero reverb]",
                         type="voice_over"
@@ -298,25 +298,27 @@ def infer_scene_metadata(scene_num: int, paragraphs: List[str]) -> CompleteScene
 # 3. Storage & Bible Persistence
 # ==========================================
 
-def load_scene_bible() -> Dict[str, Any]:
+def load_scene_bible(bible_path: Optional[str] = None) -> Dict[str, Any]:
     """Load scene bible from disk."""
-    if os.path.exists(SCENE_BIBLE_PATH):
+    target_path = bible_path or SCENE_BIBLE_PATH
+    if os.path.exists(target_path):
         try:
-            with open(SCENE_BIBLE_PATH, "r", encoding="utf-8") as f:
+            with open(target_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             pass
     return {"novel_title": "", "scenes": []}
 
-def save_scene_bible(data: Dict[str, Any]):
+def save_scene_bible(data: Dict[str, Any], bible_path: Optional[str] = None):
     """Persist scene bible to disk."""
-    os.makedirs(os.path.dirname(SCENE_BIBLE_PATH), exist_ok=True)
-    with open(SCENE_BIBLE_PATH, "w", encoding="utf-8") as f:
+    target_path = bible_path or SCENE_BIBLE_PATH
+    os.makedirs(os.path.dirname(os.path.abspath(target_path)), exist_ok=True)
+    with open(target_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def lock_scenes_into_bible(scenes: List[CompleteScene], novel_title: str = "") -> Dict[str, Any]:
-    """Save extracted scenes into data/scene_bible.json."""
-    current = load_scene_bible()
+def lock_scenes_into_bible(scenes: List[CompleteScene], novel_title: str = "", bible_path: Optional[str] = None) -> Dict[str, Any]:
+    """Save extracted scenes into scene_bible.json."""
+    current = load_scene_bible(bible_path=bible_path)
     current["novel_title"] = novel_title or current.get("novel_title", "Novel Production")
     
     existing_ids = {s.get("id") for s in current.get("scenes", [])}
@@ -329,7 +331,7 @@ def lock_scenes_into_bible(scenes: List[CompleteScene], novel_title: str = "") -
     for i, s in enumerate(current["scenes"]):
         s["scene_number"] = i + 1
 
-    save_scene_bible(current)
+    save_scene_bible(current, bible_path=bible_path)
     return current
 
 # ==========================================
@@ -345,11 +347,25 @@ def segment_novel_scenes_node(state: SceneAgentState) -> Dict[str, Any]:
 
 def extract_complete_scenes_node(state: SceneAgentState) -> Dict[str, Any]:
     blocks = state.get("raw_scene_blocks", [])
+    txt_path = state.get("novel_text_path", "")
     print(f"[Node: ExtractCompleteScenes] Generating cinematic breakdown for {len(blocks)} scenes...", flush=True)
-    
+
+    # Discover characters and locations dynamically from manuscript
+    try:
+        from novel_production_graph import discover_novel_characters
+        known_chars = discover_novel_characters(txt_path) if txt_path else []
+    except Exception:
+        known_chars = []
+
+    try:
+        from environment_production_graph import discover_novel_locations
+        known_locs = discover_novel_locations(txt_path) if txt_path else []
+    except Exception:
+        known_locs = []
+
     scenes = []
     for blk in blocks:
-        sc = infer_scene_metadata(blk["scene_number"], blk["paragraphs"])
+        sc = infer_scene_metadata(blk["scene_number"], blk["paragraphs"], known_characters=known_chars, known_locations=known_locs)
         scenes.append(sc.model_dump())
         print(f"  * Scene {sc.scene_number}: {sc.slugline} ({len(sc.characters_present)} chars, {len(sc.dialogue_flow)} audio lines)", flush=True)
 
@@ -359,8 +375,9 @@ def lock_scenes_node(state: SceneAgentState) -> Dict[str, Any]:
     extracted_data = state.get("extracted_scenes", [])
     scene_objects = [CompleteScene(**d) for d in extracted_data]
     novel_name = os.path.basename(state.get("novel_text_path", "")).replace(".txt", "").replace("_", " ").title()
-    lock_scenes_into_bible(scene_objects, novel_name)
-    print(f"[Node: LockScenes] Successfully locked {len(scene_objects)} complete scenes into {SCENE_BIBLE_PATH}", flush=True)
+    target_bible = state.get("bible_path") or SCENE_BIBLE_PATH
+    lock_scenes_into_bible(scene_objects, novel_name, bible_path=target_bible)
+    print(f"[Node: LockScenes] Successfully locked {len(scene_objects)} complete scenes into {target_bible}", flush=True)
     return {"is_locked": True}
 
 def build_scene_pipeline_graph():

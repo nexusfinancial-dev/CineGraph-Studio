@@ -190,7 +190,7 @@
           </div>
           <div v-if="executionMode === 'character'" class="flex flex-col gap-1">
             <label class="text-[11px] text-gray-400 font-medium">Character Name:</label>
-            <input v-model="targetCharacterName" placeholder="e.g. Mamba, Blossom, Pinky Peach..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 transition font-medium" />
+            <input v-model="targetCharacterName" placeholder="e.g. Colin, Danielle, or leave blank to auto-discover cast..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 transition font-medium" />
           </div>
         </div>
 
@@ -198,7 +198,7 @@
         <div v-else-if="targetType === 'voiceprint'" class="flex flex-col gap-2">
           <div class="flex flex-col gap-1">
             <label class="text-[11px] text-gray-400 font-medium">Character for Acoustic Voiceprint:</label>
-            <input v-model="targetCharacterName" placeholder="e.g. Mamba, Blossom, Brock..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 transition font-medium" />
+            <input v-model="targetCharacterName" placeholder="e.g. Character name, or leave blank for protagonist..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 transition font-medium" />
           </div>
           <p class="text-[10px] text-purple-300/80">
             Extracts the 5-dimension voice design prompt (Qwen3-TTS / CosyVoice) and verbatim English dialogue lines with [Instruction: ...] tags.
@@ -217,7 +217,7 @@
           </div>
           <div v-if="envExecutionMode === 'single'" class="flex flex-col gap-1">
             <label class="text-[11px] text-gray-400 font-medium">Environment / Scene Location:</label>
-            <input v-model="targetLocationName" placeholder="e.g. Brock's Luxury Penthouse Apartment" class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 transition font-medium" />
+            <input v-model="targetLocationName" placeholder="e.g. Living room, office, studio, or leave blank to discover..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 transition font-medium" />
           </div>
         </div>
 
@@ -239,7 +239,7 @@
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-[11px] text-gray-400 font-medium">Character Focus (Optional):</label>
-            <input v-model="scriptCharacter" placeholder="e.g. Mamba, Blossom, or leave blank for scene..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 transition font-medium" />
+            <input v-model="scriptCharacter" placeholder="e.g. Colin, Danielle, or leave blank for scene..." class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 transition font-medium" />
           </div>
           <p class="text-[10px] text-gray-400 italic">
             Extracts verbatim spoken dialogues in original English, inner monologue VO, and cinematic narrator exposition with [Instruction:] performance directives.
@@ -1303,7 +1303,27 @@ createApp({
 
     const onBookSelected = () => {
       selectedBookInfo.value = books.value.find(b => b.id === selectedBook.value) || null;
-      addLog(`[BookSelected] Switched active novel to: ${selectedBookInfo.value ? selectedBookInfo.value.title : ''}`);
+      const bTitle = selectedBookInfo.value ? selectedBookInfo.value.title : selectedBook.value;
+      addLog(`[BookSelected] Switched active novel to: ${bTitle}`);
+      
+      // Clean canvas for switching books to prevent cross-novel contamination
+      lockedCharacters.value = [];
+      lockedEnvironments.value = [];
+      lockedScenes.value = [];
+      lockedShots.value = [];
+      scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [] };
+      microScenesBible.value = {};
+      targetCharacterName.value = '';
+      targetLocationName.value = '';
+      scriptCharacter.value = '';
+
+      // Load this specific book's scoped bibles
+      const bId = selectedBook.value;
+      fetchLockedCharacters(bId);
+      fetchLockedEnvironments(bId);
+      fetchScriptData(bId);
+      fetchLockedScenes(bId);
+      fetchLockedMicroScenes(bId);
     };
 
     const addLog = (msg) => {
@@ -1386,12 +1406,20 @@ createApp({
     });
 
     const getSpeakerBadgeClass = (spk) => {
-      const s = (spk || '').toLowerCase();
-      if (s.includes('mamba')) return 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60';
-      if (s.includes('blossom')) return 'bg-pink-950/80 text-pink-300 border border-pink-700/60';
-      if (s.includes('brock')) return 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
-      if (s.includes('doctor') || s.includes('councilman')) return 'bg-indigo-950/80 text-indigo-300 border border-indigo-700/60';
-      return 'bg-gray-800 text-gray-200 border border-gray-700';
+      const colors = [
+        'bg-amber-950/80 text-amber-300 border border-amber-700/60',
+        'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60',
+        'bg-pink-950/80 text-pink-300 border border-pink-700/60',
+        'bg-sky-950/80 text-sky-300 border border-sky-700/60',
+        'bg-purple-950/80 text-purple-300 border border-purple-700/60',
+        'bg-indigo-950/80 text-indigo-300 border border-indigo-700/60',
+        'bg-rose-950/80 text-rose-300 border border-rose-700/60',
+        'bg-teal-950/80 text-teal-300 border border-teal-700/60',
+      ];
+      if (!spk) return 'bg-gray-800 text-gray-200 border border-gray-700';
+      let hash = 0;
+      for (let i = 0; i < spk.length; i++) hash = spk.charCodeAt(i) + ((hash << 5) - hash);
+      return colors[Math.abs(hash) % colors.length];
     };
 
     const exportScriptJson = () => {
@@ -1404,11 +1432,13 @@ createApp({
       addLog("[Export] Audio script screenplay exported to JSON!");
     };
 
-    const fetchScriptData = async () => {
+    const fetchScriptData = async (bookId) => {
       try {
-        const res = await fetch('/api/agent/script');
+        const b = bookId !== undefined ? bookId : selectedBook.value;
+        const res = await fetch(`/api/agent/script?book_id=${encodeURIComponent(b || '')}`);
         const data = await res.json();
         if (data) scriptData.value = data;
+        else scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [] };
       } catch (e) {
         console.log("Script fetch error:", e);
       }
@@ -1428,11 +1458,13 @@ createApp({
       addLog("[Export] Complete production scenes exported to JSON!");
     };
 
-    const fetchLockedScenes = async () => {
+    const fetchLockedScenes = async (bookId) => {
       try {
-        const res = await fetch('/api/agent/scenes');
+        const b = bookId !== undefined ? bookId : selectedBook.value;
+        const res = await fetch(`/api/agent/scenes?book_id=${encodeURIComponent(b || '')}`);
         const data = await res.json();
         if (data && data.scenes) lockedScenes.value = data.scenes;
+        else lockedScenes.value = [];
       } catch (e) {
         console.log("Scenes fetch error:", e);
       }
@@ -1476,13 +1508,17 @@ createApp({
       addLog("[Export] Micro-scenes shot list exported to JSON!");
     };
 
-    const fetchLockedMicroScenes = async () => {
+    const fetchLockedMicroScenes = async (bookId) => {
       try {
-        const res = await fetch('/api/agent/micro_scenes');
+        const b = bookId !== undefined ? bookId : selectedBook.value;
+        const res = await fetch(`/api/agent/micro_scenes?book_id=${encodeURIComponent(b || '')}`);
         const data = await res.json();
         if (data) {
           microScenesBible.value = data;
-          if (data.shots) lockedShots.value = data.shots;
+          lockedShots.value = data.shots || [];
+        } else {
+          microScenesBible.value = {};
+          lockedShots.value = [];
         }
       } catch (e) {
         console.log("Micro-scenes fetch error:", e);
@@ -1557,7 +1593,7 @@ createApp({
           if (data.logs) data.logs.forEach(l => addLog(l));
           addLog("[PipelineComplete] Characters successfully verified, locked, and studio prompts compiled!");
         } else if (targetType.value === 'voiceprint') {
-          const charParam = targetCharacterName.value || 'Mamba';
+          const charParam = targetCharacterName.value ? targetCharacterName.value.trim() : '';
           const res = await fetch('/api/agent/run_voiceprint', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1618,7 +1654,7 @@ createApp({
           addLog(`[PipelineComplete] ${lockedShots.value.length} Generative Video Takes locked (6s-15s, 2.0 wps)!`);
           activeTab.value = 'shots';
         } else {
-          const locParam = envExecutionMode.value === 'single' ? targetLocationName.value : 'Meteoropolis Reincarnation Laboratories';
+          const locParam = envExecutionMode.value === 'single' ? targetLocationName.value.trim() : '';
           const res = await fetch('/api/agent/run_environment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1664,21 +1700,25 @@ createApp({
       }
     };
 
-    const fetchLockedCharacters = async () => {
+    const fetchLockedCharacters = async (bookId) => {
       try {
-        const res = await fetch('/api/agent/characters');
+        const b = bookId !== undefined ? bookId : selectedBook.value;
+        const res = await fetch(`/api/agent/characters?book_id=${encodeURIComponent(b || '')}`);
         const data = await res.json();
-        if (data.characters) lockedCharacters.value = data.characters;
+        if (data && data.characters) lockedCharacters.value = data.characters;
+        else lockedCharacters.value = [];
       } catch (e) {
         console.log("Characters fetch error:", e);
       }
     };
 
-    const fetchLockedEnvironments = async () => {
+    const fetchLockedEnvironments = async (bookId) => {
       try {
-        const res = await fetch('/api/agent/environments');
+        const b = bookId !== undefined ? bookId : selectedBook.value;
+        const res = await fetch(`/api/agent/environments?book_id=${encodeURIComponent(b || '')}`);
         const data = await res.json();
-        if (data.environments) lockedEnvironments.value = data.environments;
+        if (data && data.environments) lockedEnvironments.value = data.environments;
+        else lockedEnvironments.value = [];
       } catch (e) {
         console.log("Environments fetch error:", e);
       }
@@ -1906,14 +1946,10 @@ createApp({
       }
     };
 
-    onMounted(() => {
+    onMounted(async () => {
       setupDialogFallback(document.getElementById('resetModal'));
-      fetchBooks();
-      fetchLockedCharacters();
-      fetchLockedEnvironments();
-      fetchScriptData();
-      fetchLockedScenes();
-      fetchLockedMicroScenes();
+      await fetchBooks();
+      onBookSelected();
       checkComfyStatus();
       setInterval(checkComfyStatus, 15000);
     });

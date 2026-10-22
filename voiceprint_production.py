@@ -58,8 +58,10 @@ def extract_character_dialogue_passages(char_name: str, txt_path: str, max_passa
 
     return dialogue_paragraphs
 
-def get_precomputed_canonical_voiceprint(char_name: str) -> Optional[CanonicalVoiceprint]:
+def get_precomputed_canonical_voiceprint(char_name: str, txt_path: Optional[str] = None) -> Optional[CanonicalVoiceprint]:
     """Deterministic canonical fallback voiceprints grounded 100% in the novel for key characters."""
+    if txt_path and not ("solar" in txt_path.lower() or "dragons" in txt_path.lower()):
+        return None
     c_lower = char_name.lower().strip()
     
     if "mamba" in c_lower:
@@ -132,7 +134,7 @@ def get_precomputed_canonical_voiceprint(char_name: str) -> Optional[CanonicalVo
 
 def extract_or_design_voiceprint(char_name: str, txt_path: str) -> CanonicalVoiceprint:
     """Extract or design voiceprint using local LLM with deterministic novel fallback."""
-    precomputed = get_precomputed_canonical_voiceprint(char_name)
+    precomputed = get_precomputed_canonical_voiceprint(char_name, txt_path=txt_path)
     if precomputed:
         return precomputed
 
@@ -220,7 +222,7 @@ def lock_voiceprint_into_bible(char_name: str, voiceprint: CanonicalVoiceprint, 
     print(f"[Voiceprint] Successfully locked voiceprint for {char_name} into {bible_path}", flush=True)
 
 if __name__ == "__main__":
-    target = sys.argv[1] if len(sys.argv) > 1 else "Mamba"
+    target = sys.argv[1] if len(sys.argv) > 1 else "Protagonist"
     txt = sys.argv[2] if len(sys.argv) > 2 else os.path.join(BASE_DIR, "graphrag_workspace", "input", "sample_novel.txt")
     print(f"=== Running Voiceprint Extraction for: {target} ===", flush=True)
     vp = extract_or_design_voiceprint(target, txt)

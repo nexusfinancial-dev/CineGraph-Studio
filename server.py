@@ -8,7 +8,7 @@ import subprocess
 import requests
 import xml.etree.ElementTree as ET
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -938,7 +938,7 @@ Extract strictly what is written in the book text, providing accurate descriptio
 Do not censor or omit any character details, romantic relationships, anatomical features, or clothing styles mentioned in the text.
 
 For each character, return a JSON object with:
-- "name_en": Character's primary English name (e.g. "Blossom", "Pinky Peach", "Brock Clayton")
+- "name_en": Character's primary English name as written in this novel text
 - "name_ar": Character's name in Arabic transliteration (الاسم باللغة العربية)
 - "aliases_en": List of English nicknames, titles, or alternative names
 - "aliases_ar": List of Arabic nicknames or titles
@@ -1102,10 +1102,6 @@ def characters_match(c1: dict, c2: dict) -> bool:
     if t1 and t2 and len(t1) >= 4 and len(t2) >= 4 and (t1 == t2 or t1 == norm2 or t2 == norm1):
         return True
         
-    # Never match protagonist Brock Clayton with The Dragon (Splice Partner)
-    if ('dragon' in norm1 and 'brock' in norm2) or ('dragon' in norm2 and 'brock' in norm1):
-        return False
-
     # 3. Aliases cross match
     aliases1 = [a for a in (c1.get('aliases') or []) if a]
     aliases2 = [a for a in (c2.get('aliases') or []) if a]
@@ -1358,12 +1354,6 @@ def locations_match(l1: dict, l2: dict) -> bool:
             return True
         if cat1 and cat2:
             return cat1 == cat2
-
-    # Streets in Sylvan / Meteoropolis
-    if ('sylvan' in norm1 and 'street' in norm1 and 'bellview' in norm1 and 'residential' in norm2):
-        return True
-    if ('meteoropolis' in norm1 and 'exterior' in norm1) and ('meteoropolis' in norm2 and 'exterior' in norm2):
-        return True
 
     # Same primary venue
     w_main1 = canonical_tokens(main1)
@@ -2512,7 +2502,11 @@ def rebuild_character_bible_for_book(book_id: str) -> Dict[str, Any]:
         if not s: return ""
         return s.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"').strip()
 
+    is_solar = "solar" in book_id.lower()
+
     def find_match(raw):
+        if not is_solar:
+            return None
         norm = clean_name_str(raw).lower()
         for c in CANONICAL_CHARACTERS_MASTER:
             for pat in c["alias_patterns"]:
@@ -2521,30 +2515,31 @@ def rebuild_character_bible_for_book(book_id: str) -> Dict[str, Any]:
         return None
 
     dossiers = {}
-    for c in CANONICAL_CHARACTERS_MASTER:
-        cid = c["id"]
-        dossiers[cid] = {
-            "id": cid,
-            "name": c["canonical_en"],
-            "name_ar": c["canonical_ar"],
-            "role": c["role"],
-            "role_ar": c["role_ar"],
-            "species": c["species"],
-            "species_ar": c["species_ar"],
-            "gender": c["gender"],
-            "gender_ar": c["gender_ar"],
-            "physical_en": c["physical_en"],
-            "physical_ar": c["physical_ar"],
-            "visual_prompt_anchor": c["visual_prompt_anchor"],
-            "voice_profile": c["voice_profile"],
-            "voice_profile_ar": c["voice_profile_ar"],
-            "is_locked": True,
-            "aliases": set(),
-            "total_cards": 0,
-            "chapters_present": set(),
-            "card_timeline": [],
-            "distinct_wardrobes": []
-        }
+    if is_solar:
+        for c in CANONICAL_CHARACTERS_MASTER:
+            cid = c["id"]
+            dossiers[cid] = {
+                "id": cid,
+                "name": c["canonical_en"],
+                "name_ar": c["canonical_ar"],
+                "role": c["role"],
+                "role_ar": c["role_ar"],
+                "species": c["species"],
+                "species_ar": c["species_ar"],
+                "gender": c["gender"],
+                "gender_ar": c["gender_ar"],
+                "physical_en": c["physical_en"],
+                "physical_ar": c["physical_ar"],
+                "visual_prompt_anchor": c["visual_prompt_anchor"],
+                "voice_profile": c["voice_profile"],
+                "voice_profile_ar": c["voice_profile_ar"],
+                "is_locked": True,
+                "aliases": set(),
+                "total_cards": 0,
+                "chapters_present": set(),
+                "card_timeline": [],
+                "distinct_wardrobes": []
+            }
 
     minors = {}
     total_cards = 0
@@ -2747,9 +2742,9 @@ def generate_krea_prompt_gemma4(name: str, species: str, desc: str) -> str:
         "1. BASELINE DEFAULT APPEARANCE ONLY (NO STATE-AVERAGING):\n"
         "   - Depict the character in their DEFAULT, everyday canonical form.\n"
         "   - NEVER average or blend temporary power-up forms, dragon transformations, battle stances, or combat shifts into the master baseline portrait!\n"
-        "   - If a character is human with dragon/magic powers (like Brock Clayton), they are a handsome normal human in their baseline portrait: 100% human skin, strong jawline, natural stubble, NO dragon scales or lizard parts on their face.\n"
+        "   - If a character is human with magical, shifting, or combat powers, depict them in their baseline human state: natural human skin, authentic facial features, NO combat transformations or lizard/creature parts on their face.\n"
         "2. VIBRANT, HEALTHY, CHARMING AESTHETICS (NO VAMPIRES / ZOMBIES):\n"
-        "   - For fair, pale, or unicorn characters (like Pinky Peach), NEVER use chalk-white, milk-white, or dead pallor that makes them look like a corpse or vampire.\n"
+        "   - For fair or pale characters, NEVER use chalk-white, milk-white, or dead pallor that makes them look like a corpse or vampire.\n"
         "   - Describe them as extremely cute, youthful, and gorgeous: 'flawless creamy porcelain skin with soft warm peach undertones and healthy rosy blushed cheeks, soft natural pink lips, sweet charming smile, large expressive sparkling eyes'.\n"
         "3. NEVER use banned buzzwords: DO NOT use 'masterpiece', '8k', 'photorealistic', 'ultra detailed', 'hyper realistic', 'unreal engine', or 'trending on artstation'.\n"
         "4. Front-Load the Subject: Put camera framing and facial anatomy/eyes FIRST (highest visual weight).\n"
@@ -3402,10 +3397,24 @@ def reset_agent_studio():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def get_book_slug(book_id: Optional[str]) -> str:
+    if not book_id:
+        return ""
+    clean = book_id.replace("__epub", "").strip()
+    return re.sub(r'[^a-zA-Z0-9_-]', '_', clean).strip('_')
+
+def get_book_bible_path(book_id: Optional[str], bible_name: str) -> str:
+    slug = get_book_slug(book_id)
+    if not slug:
+        return os.path.join(DATA_DIR, bible_name)
+    book_bible_dir = os.path.join(DATA_DIR, "bibles", slug)
+    os.makedirs(book_bible_dir, exist_ok=True)
+    return os.path.join(book_bible_dir, bible_name)
+
 @app.get("/api/agent/characters")
-def get_agent_characters():
-    """Retrieve all locked canonical characters with voiceprints."""
-    bible_path = os.path.join(DATA_DIR, "character_bible.json")
+def get_agent_characters(book_id: Optional[str] = Query(None)):
+    """Retrieve all locked canonical characters with voiceprints for a specific book."""
+    bible_path = get_book_bible_path(book_id, "character_bible.json")
     chars = []
     if os.path.exists(bible_path):
         try:
@@ -3430,9 +3439,9 @@ def get_agent_characters():
     return {"characters": chars}
 
 @app.get("/api/agent/environments")
-def get_agent_environments():
-    """Retrieve all locked canonical environments."""
-    env_path = os.path.join(DATA_DIR, "environment_bible.json")
+def get_agent_environments(book_id: Optional[str] = Query(None)):
+    """Retrieve all locked canonical environments for a specific book."""
+    env_path = get_book_bible_path(book_id, "environment_bible.json")
     envs = []
     if os.path.exists(env_path):
         try:
@@ -3462,57 +3471,69 @@ class AgentRunRequest(BaseModel):
 def run_agent_endpoint(req: AgentRunRequest):
     """Run the GraphRAG + LangGraph agent for the specified book and character."""
     import run_agent
+    import novel_production_graph
+    import voiceprint_production
     try:
-        book_input = "Solar Dragons Need Love Too 1" if "solar" in req.book_id.lower() else req.book_id
+        book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
+        bible_path = get_book_bible_path(req.book_id, "character_bible.json")
         app_graph = run_agent.build_production_graph()
         
-        target_char = req.character.strip() if req.character else "Mamba"
-        identity = run_agent.run_for_character(app_graph, target_char, txt_path)
+        target_char = req.character.strip() if req.character else ""
+        chars_to_run = []
+        if target_char:
+            chars_to_run = [target_char]
+        else:
+            discovered = novel_production_graph.discover_novel_characters(txt_path)
+            chars_to_run = discovered[:4] if discovered else ["Protagonist"]
         
-        # Also extract acoustic voiceprint
-        try:
-            import voiceprint_production
-            vp = voiceprint_production.extract_or_design_voiceprint(target_char, txt_path)
-            voiceprint_production.lock_voiceprint_into_bible(target_char, vp)
-        except Exception:
-            pass
-
-        # Reload characters list
-        chars_res = get_agent_characters()
+        logs = []
+        for ch in chars_to_run:
+            run_agent.run_for_character(app_graph, ch, txt_path, bible_path=bible_path)
+            logs.append(f"[Success] Processed {ch} via LangGraph & GraphRAG")
+            try:
+                vp = voiceprint_production.extract_or_design_voiceprint(ch, txt_path)
+                voiceprint_production.lock_voiceprint_into_bible(ch, vp, bible_path=bible_path)
+                logs.append(f"[Voiceprint] Synthesized acoustic profile & original English dialogue for {ch}")
+            except Exception as e_vp:
+                logs.append(f"[Voiceprint Note] {ch}: {e_vp}")
+        
+        chars_res = get_agent_characters(book_id=req.book_id)
         return {
             "status": "success",
-            "message": f"Successfully audited and locked {target_char} (Visual + Voiceprint)",
+            "message": f"Successfully audited and locked {len(chars_to_run)} character(s) for {req.book_id}",
             "characters": chars_res.get("characters", []),
-            "logs": [
-                f"[Success] Processed {target_char} via LangGraph & GraphRAG",
-                f"[Canon Lock] Verified traits saved to character_bible.json",
-                f"[Voiceprint] Synthesized 5-dimension acoustic profile & original English dialogue"
-            ]
+            "logs": logs
         }
     except Exception as e:
         return {
             "status": "error",
             "message": str(e),
-            "characters": get_agent_characters().get("characters", [])
+            "characters": get_agent_characters(book_id=req.book_id).get("characters", [])
         }
 
 class VoiceprintRunRequest(BaseModel):
     book_id: str
-    character: str
+    character: Optional[str] = ""
 
 @app.post("/api/agent/run_voiceprint")
 def run_voiceprint_endpoint(req: VoiceprintRunRequest):
     """Run dedicated voiceprint extraction for character."""
     import run_agent
     import voiceprint_production
+    import novel_production_graph
     try:
-        book_input = "Solar Dragons Need Love Too 1" if "solar" in req.book_id.lower() else req.book_id
+        book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
-        target_char = req.character.strip() if req.character else "Mamba"
+        bible_path = get_book_bible_path(req.book_id, "character_bible.json")
+        target_char = req.character.strip() if req.character else ""
+        if not target_char:
+            discovered = novel_production_graph.discover_novel_characters(txt_path)
+            target_char = discovered[0] if discovered else "Protagonist"
+            
         vp = voiceprint_production.extract_or_design_voiceprint(target_char, txt_path)
-        voiceprint_production.lock_voiceprint_into_bible(target_char, vp)
-        chars_res = get_agent_characters()
+        voiceprint_production.lock_voiceprint_into_bible(target_char, vp, bible_path=bible_path)
+        chars_res = get_agent_characters(book_id=req.book_id)
         return {
             "status": "success",
             "message": f"Voiceprint generated for {target_char}",
@@ -3526,7 +3547,7 @@ def run_voiceprint_endpoint(req: VoiceprintRunRequest):
         return {
             "status": "error",
             "message": str(e),
-            "characters": get_agent_characters().get("characters", [])
+            "characters": get_agent_characters(book_id=req.book_id).get("characters", [])
         }
 
 class EnvironmentRunRequest(BaseModel):
@@ -3539,48 +3560,56 @@ def run_environment_endpoint(req: EnvironmentRunRequest):
     import run_agent
     import environment_production_graph
     try:
-        book_input = "Solar Dragons Need Love Too 1" if "solar" in req.book_id.lower() else req.book_id
+        book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
+        bible_path = get_book_bible_path(req.book_id, "environment_bible.json")
         
-        target_loc = req.location.strip() if req.location else "Meteoropolis Reincarnation Laboratories"
+        target_loc = req.location.strip() if req.location else ""
+        locs_to_run = []
+        if target_loc:
+            locs_to_run = [target_loc]
+        else:
+            discovered_locs = environment_production_graph.discover_novel_locations(txt_path)
+            locs_to_run = discovered_locs[:3] if discovered_locs else ["Primary Setting"]
+            
         app_graph = environment_production_graph.build_environment_graph()
+        logs = []
+        for loc in locs_to_run:
+            initial_state = {
+                "location_name": loc,
+                "novel_text_path": txt_path,
+                "retrieved_passages": [],
+                "canonical_environment": None,
+                "conflicts": [],
+                "user_resolutions": {},
+                "is_locked": False,
+                "matte_painting_prompt": None,
+                "bible_path": bible_path
+            }
+            config = {"configurable": {"thread_id": f"env_run_{re.sub(r'[^a-zA-Z0-9]', '_', loc.lower())}"}}
+            app_graph.invoke(initial_state, config=config)
+            logs.append(f"[Success] Extracted environment: {loc}")
         
-        initial_state = {
-            "location_name": target_loc,
-            "novel_text_path": txt_path,
-            "retrieved_passages": [],
-            "canonical_environment": None,
-            "conflicts": [],
-            "user_resolutions": {},
-            "is_locked": False,
-            "matte_painting_prompt": None
-        }
-        config = {"configurable": {"thread_id": f"env_run_{target_loc.lower().replace(' ', '_')}"}}
-        result = app_graph.invoke(initial_state, config=config)
-        
-        envs_res = get_agent_environments()
+        envs_res = get_agent_environments(book_id=req.book_id)
         return {
             "status": "success",
-            "message": f"Successfully extracted and locked environment: {target_loc}",
+            "message": f"Successfully extracted and locked {len(locs_to_run)} environment(s)",
             "environments": envs_res.get("environments", []),
-            "logs": [
-                f"[Success] Extracted environment: {target_loc}",
-                f"[Architecture Lock] Materials & lighting saved to environment_bible.json",
-                f"[ComfyUI Ready] Matte painting establishing prompt compiled."
-            ]
+            "logs": logs
         }
     except Exception as e:
         return {
             "status": "error",
             "message": str(e),
-            "environments": get_agent_environments().get("environments", [])
+            "environments": get_agent_environments(book_id=req.book_id).get("environments", [])
         }
 
 @app.get("/api/agent/script")
-def get_agent_script():
-    """Retrieve all extracted dialogues, voice-overs, and narrator lines."""
+def get_agent_script(book_id: Optional[str] = Query(None)):
+    """Retrieve all extracted dialogues, voice-overs, and narrator lines for a book."""
     import dialogue_production_graph
-    data = dialogue_production_graph.load_script_bible()
+    bible_path = get_book_bible_path(book_id, "script_bible.json")
+    data = dialogue_production_graph.load_script_bible(bible_path=bible_path)
     return data
 
 class ScriptRunRequest(BaseModel):
@@ -3595,8 +3624,9 @@ def run_script_endpoint(req: ScriptRunRequest):
     import run_agent
     import dialogue_production_graph
     try:
-        book_input = "Solar Dragons Need Love Too 1" if "solar" in req.book_id.lower() else req.book_id
+        book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
+        bible_path = get_book_bible_path(req.book_id, "script_bible.json")
         
         target_char = req.character.strip() if req.character else None
         scope = req.scope.strip().lower() if req.scope else "all"
@@ -3609,37 +3639,40 @@ def run_script_endpoint(req: ScriptRunRequest):
             "target_scene": None,
             "raw_passages": [],
             "extracted_script": None,
-            "is_locked": False
+            "is_locked": False,
+            "bible_path": bible_path
         }
         config = {"configurable": {"thread_id": f"script_run_{uuid.uuid4().hex[:6]}"}}
         app_graph.invoke(initial_state, config=config)
         
-        script_res = dialogue_production_graph.load_script_bible()
+        script_res = dialogue_production_graph.load_script_bible(bible_path=bible_path)
         return {
             "status": "success",
-            "message": f"Successfully extracted script ({scope})",
+            "message": f"Successfully extracted script ({scope}) for {req.book_id}",
             "script": script_res,
             "logs": [
                 f"[Script Agent] Ingested text from: {os.path.basename(txt_path)}",
                 f"[Dialogues] Extracted {len(script_res.get('dialogues', []))} character exchanges in original English",
                 f"[Voice-Over] Extracted {len(script_res.get('voice_overs', []))} internal monologues with [Instruction:] tags",
                 f"[Narrator] Extracted {len(script_res.get('narrator_chunks', []))} cinematic exposition chunks",
-                f"[Audio Locked] Saved to data/script_bible.json"
+                f"[Audio Locked] Saved to {bible_path}"
             ]
         }
     except Exception as e:
         import dialogue_production_graph
+        bible_path = get_book_bible_path(req.book_id, "script_bible.json")
         return {
             "status": "error",
             "message": str(e),
-            "script": dialogue_production_graph.load_script_bible()
+            "script": dialogue_production_graph.load_script_bible(bible_path=bible_path)
         }
 
 @app.get("/api/agent/scenes")
-def get_agent_scenes():
-    """Retrieve all locked complete scenes."""
+def get_agent_scenes(book_id: Optional[str] = Query(None)):
+    """Retrieve all locked complete scenes for a specific book."""
     import scene_production_graph
-    data = scene_production_graph.load_scene_bible()
+    bible_path = get_book_bible_path(book_id, "scene_bible.json")
+    data = scene_production_graph.load_scene_bible(bible_path=bible_path)
     return data
 
 class SceneRunRequest(BaseModel):
@@ -3653,8 +3686,9 @@ def run_scenes_endpoint(req: SceneRunRequest):
     import run_agent
     import scene_production_graph
     try:
-        book_input = "Solar Dragons Need Love Too 1" if "solar" in req.book_id.lower() else req.book_id
+        book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
+        bible_path = get_book_bible_path(req.book_id, "scene_bible.json")
         
         app_graph = scene_production_graph.build_scene_pipeline_graph()
         initial_state = {
@@ -3662,30 +3696,32 @@ def run_scenes_endpoint(req: SceneRunRequest):
             "target_chapter_or_query": None,
             "raw_scene_blocks": [],
             "extracted_scenes": [],
-            "is_locked": False
+            "is_locked": False,
+            "bible_path": bible_path
         }
         config = {"configurable": {"thread_id": f"scene_run_{uuid.uuid4().hex[:6]}"}}
         app_graph.invoke(initial_state, config=config)
         
-        bible_res = scene_production_graph.load_scene_bible()
+        bible_res = scene_production_graph.load_scene_bible(bible_path=bible_path)
         scenes_list = bible_res.get("scenes", [])
         return {
             "status": "success",
-            "message": f"Successfully extracted and locked {len(scenes_list)} complete scenes",
+            "message": f"Successfully extracted and locked {len(scenes_list)} complete scenes for {req.book_id}",
             "scenes": scenes_list,
             "scene_bible": bible_res,
             "logs": [
                 f"[Scene Agent] Ingested manuscript from: {os.path.basename(txt_path)}",
                 f"[Segmentation] Segmented narrative into {len(scenes_list)} complete cinematic sequences",
                 f"[Sluglines] Assigned INT./EXT. locations and time of day",
-                f"[Keyframes] Generated 24mm anamorphic ComfyUI/Flux prompts for all scenes",
+                f"[Keyframes] Generated ComfyUI prompts for all scenes",
                 f"[Audio Integrated] Linked dialogues, voice-overs, and soundscape foley",
-                f"[Locked] Complete Scene Bible saved to data/scene_bible.json"
+                f"[Locked] Complete Scene Bible saved to {bible_path}"
             ]
         }
     except Exception as e:
         import scene_production_graph
-        bible_res = scene_production_graph.load_scene_bible()
+        bible_path = get_book_bible_path(req.book_id, "scene_bible.json")
+        bible_res = scene_production_graph.load_scene_bible(bible_path=bible_path)
         return {
             "status": "error",
             "message": str(e),
@@ -3694,14 +3730,15 @@ def run_scenes_endpoint(req: SceneRunRequest):
         }
 
 @app.get("/api/agent/micro_scenes")
-def get_agent_micro_scenes():
-    """Retrieve all locked 6s-15s micro-scenes / cinematic shots."""
+def get_agent_micro_scenes(book_id: Optional[str] = Query(None)):
+    """Retrieve all locked 6s-15s micro-scenes / cinematic shots for a book."""
     import micro_scene_production_graph
-    data = micro_scene_production_graph.load_micro_scenes_bible()
+    bible_path = get_book_bible_path(book_id, "micro_scenes_bible.json")
+    data = micro_scene_production_graph.load_micro_scenes_bible(bible_path=bible_path)
     return data
 
 class MicroSceneRunRequest(BaseModel):
-    book_id: Optional[str] = "solar_1"
+    book_id: Optional[str] = ""
     min_duration: Optional[float] = 6.0
     max_duration: Optional[float] = 15.0
     words_per_sec: Optional[float] = 2.0
@@ -3711,9 +3748,13 @@ def run_micro_scenes_endpoint(req: MicroSceneRunRequest):
     """Run GraphRAG + LangGraph Micro-Scene / Takes Breakdown Agent."""
     import micro_scene_production_graph
     try:
+        scene_bible_path = get_book_bible_path(req.book_id, "scene_bible.json")
+        micro_bible_path = get_book_bible_path(req.book_id, "micro_scenes_bible.json")
         graph = micro_scene_production_graph.build_micro_scene_graph()
         initial_state = {
-            "scene_bible_path": micro_scene_production_graph.SCENE_BIBLE_PATH,
+            "scene_bible_path": scene_bible_path,
+            "micro_bible_path": micro_bible_path,
+            "novel_title": req.book_id or "Novel Adaptation",
             "raw_scenes": [],
             "micro_shots": [],
             "min_duration": req.min_duration or 6.0,
@@ -3721,20 +3762,32 @@ def run_micro_scenes_endpoint(req: MicroSceneRunRequest):
             "words_per_sec": req.words_per_sec or 2.0,
             "is_locked": False
         }
-        graph.invoke(initial_state)
-        bible = micro_scene_production_graph.load_micro_scenes_bible()
+        config = {"configurable": {"thread_id": f"micro_run_{re.sub(r'[^a-zA-Z0-9]', '_', str(req.book_id).lower())}"}}
+        graph.invoke(initial_state, config=config)
+        bible = micro_scene_production_graph.load_micro_scenes_bible(bible_path=micro_bible_path)
+        shots = bible.get("shots", [])
         return {
             "status": "success",
             "message": f"Successfully decomposed {bible.get('total_master_scenes')} master scenes into {bible.get('total_shots')} cinematic takes",
             "micro_scenes": bible,
-            "shots": bible.get("shots", []),
+            "shots": shots,
             "logs": [
-                f"[MicroScene Agent] Loaded master scenes from scene_bible.json",
+                f"[MicroScene Agent] Loaded master scenes from {scene_bible_path}",
                 f"[Pacing Calibration] Applied 2.0 words/second speech cadence formula",
                 f"[Duration Boundaries] Calibrated all takes strictly between {req.min_duration or 6.0}s and {req.max_duration or 15.0}s",
                 f"[AI Video Prompts] Generated MiniMax H3 / Kling / Runway Gen-3 prompts with lens specs",
-                f"[Locked] Successfully locked {bible.get('total_shots')} takes into data/micro_scenes_bible.json"
+                f"[Locked] Successfully locked {len(shots)} takes into {micro_bible_path}"
             ]
+        }
+    except Exception as e:
+        import micro_scene_production_graph
+        micro_bible_path = get_book_bible_path(req.book_id, "micro_scenes_bible.json")
+        bible_res = micro_scene_production_graph.load_micro_scenes_bible(bible_path=micro_bible_path)
+        return {
+            "status": "error",
+            "message": str(e),
+            "micro_scenes": bible_res,
+            "shots": bible_res.get("shots", [])
         }
     except Exception as e:
         import micro_scene_production_graph

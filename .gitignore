@@ -56,6 +56,7 @@ tmp/
 data/backup_pre_reset/
 data/books/*
 !data/books/.gitkeep
+data/bibles/
 data/asset_bible.json
 data/bible_*.json
 data/storyboard_*.json
