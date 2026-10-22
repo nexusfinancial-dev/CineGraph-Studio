@@ -1,6 +1,7 @@
 """
 CineGraph Studio - Novel Brain LoRA Fine-Tuner (QLoRA)
 Pure Verbatim Narrative Training (Zero Synthetic Hallucination)
+Standard Battle-Tested HuggingFace Trainer Architecture
 """
 
 import os
@@ -16,7 +17,18 @@ import argparse
 import re
 from typing import List, Dict, Any
 import torch
-from transformers import TrainerCallback
+
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    BitsAndBytesConfig,
+    Trainer,
+    TrainingArguments,
+    DataCollatorForLanguageModeling,
+    TrainerCallback
+)
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from datasets import Dataset
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_HERMES_DIR = r"C:\Users\MiroAI\.cache\huggingface\hub\models--NousResearch--Hermes-3-Llama-3.1-8B\snapshots\896ea440e5a9e6070e3d8a2774daf2b481ab425b"
@@ -168,7 +180,7 @@ def train_novel_lora(
     })
 
     print(f"\n=======================================================", flush=True)
-    print(f"[Novel Brain] Starting QLoRA Fine-Tuner", flush=True)
+    print(f"[Novel Brain] Starting QLoRA Fine-Tuner (Native Trainer)", flush=True)
     print(f"[Novel Brain] Novel: {book_id}", flush=True)
     print(f"[Novel Brain] Base Model: {base_model_name}", flush=True)
     print(f"[Novel Brain] Epochs: {epochs} | Batch size: {batch_size}", flush=True)
@@ -189,11 +201,6 @@ def train_novel_lora(
         "eta": "loading model",
         "message": f"Loading Nous Hermes 3 (8B) in 4-bit NF4 QLoRA on GPU..."
     })
-
-    from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-    from datasets import Dataset
-    from trl import SFTTrainer, SFTConfig
 
     # 2. 4-bit Quantization Config (QLoRA)
     bnb_config = BitsAndBytesConfig(
@@ -216,15 +223,15 @@ def train_novel_lora(
         tokenizer.pad_token = tokenizer.eos_token
 
     print(f"[Model] Initializing 4-bit quantized base model weights on RTX GPU (local={is_local})...", flush=True)
-    model = AutoModelForCausalLM.from_pretrained(
+    base_model = AutoModelForCausalLM.from_pretrained(
         model_path,
         quantization_config=bnb_config,
         device_map="auto",
         trust_remote_code=True,
         local_files_only=is_local
     )
-    model = prepare_model_for_kbit_training(model)
-    vram_mb = model.get_memory_footprint() / 1024 / 1024
+    base_model = prepare_model_for_kbit_training(base_model)
+    vram_mb = base_model.get_memory_footprint() / 1024 / 1024
     print(f"[Model] Base model loaded into GPU VRAM successfully ({vram_mb:.1f} MB allocated).", flush=True)
 
     # 3. LoRA Configuration
@@ -246,37 +253,44 @@ def train_novel_lora(
         bias="none",
         task_type="CAUSAL_LM"
     )
-    model = get_peft_model(model, lora_config)
+    model = get_peft_model(base_model, lora_config)
     trainable_params, all_param = model.get_nb_trainable_parameters()
     print(f"[LoRA] Trainable parameters: {trainable_params:,} / {all_param:,} ({100 * trainable_params / all_param:.2f}%)", flush=True)
 
-    # 4. Prepare Dataset
-    dataset = Dataset.from_dict({"text": chunks})
+    # 4. Prepare Dataset with dynamic language modeling collation
+    print(f"[Dataset] Tokenizing narrative chunks with max_length={max_seq_length}...", flush=True)
+    tokenized = tokenizer(
+        chunks,
+        truncation=True,
+        max_length=max_seq_length
+    )
+    dataset = Dataset.from_dict({
+        "input_ids": tokenized["input_ids"],
+        "attention_mask": tokenized["attention_mask"]
+    })
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
     # 5. Training Arguments
-    sft_config = SFTConfig(
+    training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=epochs,
         per_device_train_batch_size=batch_size,
         gradient_accumulation_steps=4,
         learning_rate=learning_rate,
         bf16=True,
-        logging_steps=2,
+        logging_steps=1,
         save_strategy="no",
         report_to="none",
-        dataset_text_field="text",
-        max_length=max_seq_length,
         warmup_steps=5
     )
 
     progress_cb = NovelBrainProgressCallback(status_file=status_file, epochs=epochs)
 
-    trainer = SFTTrainer(
+    trainer = Trainer(
         model=model,
         train_dataset=dataset,
-        peft_config=lora_config,
-        args=sft_config,
-        processing_class=tokenizer,
+        args=training_args,
+        data_collator=data_collator,
         callbacks=[progress_cb]
     )
 
