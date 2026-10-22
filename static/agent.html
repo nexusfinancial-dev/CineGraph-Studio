@@ -125,7 +125,7 @@
 
         <div class="flex flex-col gap-2">
           <select v-model="selectedBook" @change="onBookSelected" class="w-full bg-[#080c14] border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 transition">
-            <option value="" disabled>-- Select a novel from library --</option>
+            <option value="" disabled selected>-- Select a novel from library --</option>
             <option v-for="b in books" :key="b.id" :value="b.id">{{ b.title }}</option>
           </select>
 
@@ -1414,11 +1414,9 @@ createApp({
 
     const autoCanonMode = ref(true);
 
-    const books = ref([
-      { id: 'solar_1', title: 'Solar Dragons Need Love Too 1', filename: 'Solar Dragons Need Love Too 1.epub', format: 'EPUB', indexed: true }
-    ]);
-    const selectedBook = ref('solar_1');
-    const selectedBookInfo = ref(books.value[0]);
+    const books = ref([]);
+    const selectedBook = ref('');
+    const selectedBookInfo = ref(null);
 
     const pipelineSteps = ref([
       { number: 1, title: 'Vector Ingestion', desc: 'BGE-M3 1024d Vector Memory', status: 'ready' },
@@ -1430,10 +1428,7 @@ createApp({
 
     const logs = ref([
       "[00:00:01] System booted in Clean Canvas Mode (Zeroed).",
-      "[00:00:02] Connected to LM Studio on 127.0.0.1:1234 (Gemma 12B Active).",
-      "[00:00:02] Loaded Vector Embedding Model: text-embedding-bge-m3 (1024 dimensions).",
-      "[00:00:03] GraphRAG Workspace initialized at c:\\AIMovies\\graphrag_workspace.",
-      "[00:00:04] Ready for Character and Environment production."
+      "[00:00:02] Production Studio ready. Select a novel from library to begin."
     ]);
     const logContainer = ref(null);
 
@@ -1453,6 +1448,17 @@ createApp({
     const speechPacingRate = ref(2.0);
 
     const onBookSelected = () => {
+      if (!selectedBook.value) {
+        selectedBookInfo.value = null;
+        lockedCharacters.value = [];
+        lockedEnvironments.value = [];
+        lockedScenes.value = [];
+        lockedShots.value = [];
+        scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
+        microScenesBible.value = { total_shots: 0, total_runtime_formatted: '0m 00s' };
+        brainStatus.value = { status: 'untrained', progress: 0, message: '' };
+        return;
+      }
       selectedBookInfo.value = books.value.find(b => b.id === selectedBook.value) || null;
       const bTitle = selectedBookInfo.value ? selectedBookInfo.value.title : selectedBook.value;
       addLog(`[BookSelected] Switched active novel to: ${bTitle}`);
@@ -1462,8 +1468,8 @@ createApp({
       lockedEnvironments.value = [];
       lockedScenes.value = [];
       lockedShots.value = [];
-      scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [] };
-      microScenesBible.value = {};
+      scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
+      microScenesBible.value = { total_shots: 0, total_runtime_formatted: '0m 00s' };
       targetCharacterName.value = '';
       targetLocationName.value = '';
       scriptCharacter.value = '';
@@ -1585,12 +1591,16 @@ createApp({
     };
 
     const fetchScriptData = async (bookId) => {
+      const b = bookId !== undefined ? bookId : selectedBook.value;
+      if (!b) {
+        scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
+        return;
+      }
       try {
-        const b = bookId !== undefined ? bookId : selectedBook.value;
-        const res = await fetch(`/api/agent/script?book_id=${encodeURIComponent(b || '')}`);
+        const res = await fetch(`/api/agent/script?book_id=${encodeURIComponent(b)}`);
         const data = await res.json();
         if (data) scriptData.value = data;
-        else scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [] };
+        else scriptData.value = { dialogues: [], voice_overs: [], narrator_chunks: [], narrator_voiceprint: null };
       } catch (e) {
         console.log("Script fetch error:", e);
       }
@@ -1611,9 +1621,13 @@ createApp({
     };
 
     const fetchLockedScenes = async (bookId) => {
+      const b = bookId !== undefined ? bookId : selectedBook.value;
+      if (!b) {
+        lockedScenes.value = [];
+        return;
+      }
       try {
-        const b = bookId !== undefined ? bookId : selectedBook.value;
-        const res = await fetch(`/api/agent/scenes?book_id=${encodeURIComponent(b || '')}`);
+        const res = await fetch(`/api/agent/scenes?book_id=${encodeURIComponent(b)}`);
         const data = await res.json();
         if (data && data.scenes) lockedScenes.value = data.scenes;
         else lockedScenes.value = [];
@@ -1661,15 +1675,20 @@ createApp({
     };
 
     const fetchLockedMicroScenes = async (bookId) => {
+      const b = bookId !== undefined ? bookId : selectedBook.value;
+      if (!b) {
+        microScenesBible.value = { total_shots: 0, total_runtime_formatted: '0m 00s' };
+        lockedShots.value = [];
+        return;
+      }
       try {
-        const b = bookId !== undefined ? bookId : selectedBook.value;
-        const res = await fetch(`/api/agent/micro_scenes?book_id=${encodeURIComponent(b || '')}`);
+        const res = await fetch(`/api/agent/micro_scenes?book_id=${encodeURIComponent(b)}`);
         const data = await res.json();
         if (data) {
           microScenesBible.value = data;
           lockedShots.value = data.shots || [];
         } else {
-          microScenesBible.value = {};
+          microScenesBible.value = { total_shots: 0, total_runtime_formatted: '0m 00s' };
           lockedShots.value = [];
         }
       } catch (e) {
@@ -1853,9 +1872,13 @@ createApp({
     };
 
     const fetchLockedCharacters = async (bookId) => {
+      const b = bookId !== undefined ? bookId : selectedBook.value;
+      if (!b) {
+        lockedCharacters.value = [];
+        return;
+      }
       try {
-        const b = bookId !== undefined ? bookId : selectedBook.value;
-        const res = await fetch(`/api/agent/characters?book_id=${encodeURIComponent(b || '')}`);
+        const res = await fetch(`/api/agent/characters?book_id=${encodeURIComponent(b)}`);
         const data = await res.json();
         if (data && data.characters) lockedCharacters.value = data.characters;
         else lockedCharacters.value = [];
@@ -1865,9 +1888,13 @@ createApp({
     };
 
     const fetchLockedEnvironments = async (bookId) => {
+      const b = bookId !== undefined ? bookId : selectedBook.value;
+      if (!b) {
+        lockedEnvironments.value = [];
+        return;
+      }
       try {
-        const b = bookId !== undefined ? bookId : selectedBook.value;
-        const res = await fetch(`/api/agent/environments?book_id=${encodeURIComponent(b || '')}`);
+        const res = await fetch(`/api/agent/environments?book_id=${encodeURIComponent(b)}`);
         const data = await res.json();
         if (data && data.environments) lockedEnvironments.value = data.environments;
         else lockedEnvironments.value = [];
@@ -2151,11 +2178,15 @@ createApp({
             title: b.title || b.filename || b.id,
             filename: b.filename || '',
             format: (b.format || 'EPUB').toUpperCase(),
-            indexed: (b.title && b.title.toLowerCase().includes('solar')) ? true : false
+            indexed: false
           }));
-          selectedBook.value = books.value[0].id;
-          selectedBookInfo.value = books.value[0];
-          addLog(`[Library] Loaded ${books.value.length} novels from library.`);
+          selectedBook.value = '';
+          selectedBookInfo.value = null;
+          addLog(`[Library] Loaded ${books.value.length} novels from library. Please select a novel to begin.`);
+        } else {
+          books.value = [];
+          selectedBook.value = '';
+          selectedBookInfo.value = null;
         }
       } catch (e) {
         console.log("Books fetch error:", e);
@@ -2235,14 +2266,13 @@ createApp({
     onMounted(async () => {
       setupDialogFallback(document.getElementById('resetModal'));
       await fetchBooks();
-      onBookSelected();
+      // Clean canvas: do NOT call onBookSelected() on startup!
       checkComfyStatus();
       checkHermesStatus();
-      checkBrainStatus();
       setInterval(() => {
         checkComfyStatus();
         checkHermesStatus();
-        if (isTrainingBrain.value || brainStatus.value.status === 'training') {
+        if (selectedBook.value && (isTrainingBrain.value || brainStatus.value.status === 'training')) {
           checkBrainStatus();
         }
       }, 5000);

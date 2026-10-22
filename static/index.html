@@ -4154,29 +4154,12 @@
             // Load Books
             await loadBooks();
 
-            // If recents exist, resume last read book!
-            if (recentsList.value.length > 0) {
-              const last = recentsList.value[0];
-              await openRecentItem(last, false);
-            } else if (books.value.length > 0) {
-              selectedBookId.value = books.value[0].id;
-              activeBookTitle.value = books.value[0].title;
-              await loadDatabase(books.value[0].id);
-              await loadChapters();
-              await loadStoryboard(books.value[0].id);
-              await pollBatchStatus();
-              pollFaceBatchStatus();
-              pollOutfitBatchStatus();
-            } else {
-              await loadDatabase();
-            }
-
-            // Pre-assign default character if available in active book's database
-            if (dbCharacters.value.length > 0) {
-              assignedCharacter.value = dbCharacters.value[0].name;
-            } else {
-              assignedCharacter.value = '';
-            }
+            // Clean startup: Do not auto-resume or auto-load any book on boot
+            // A novel is only loaded when explicitly chosen by the user
+            selectedBookId.value = '';
+            activeBookTitle.value = '';
+            chapters.value = [];
+            assignedCharacter.value = '';
           } catch (e) {
             console.error('Initialization error:', e);
           }

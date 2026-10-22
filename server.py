@@ -3417,6 +3417,8 @@ def get_book_bible_path(book_id: Optional[str], bible_name: str) -> str:
 @app.get("/api/agent/characters")
 def get_agent_characters(book_id: Optional[str] = Query(None)):
     """Retrieve all locked canonical characters with voiceprints for a specific book."""
+    if not book_id or not get_book_slug(book_id):
+        return {"characters": []}
     bible_path = get_book_bible_path(book_id, "character_bible.json")
     chars = []
     if os.path.exists(bible_path):
@@ -3446,6 +3448,8 @@ def get_agent_characters(book_id: Optional[str] = Query(None)):
 @app.get("/api/agent/environments")
 def get_agent_environments(book_id: Optional[str] = Query(None)):
     """Retrieve all locked canonical environments for a specific book."""
+    if not book_id or not get_book_slug(book_id):
+        return {"environments": []}
     env_path = get_book_bible_path(book_id, "environment_bible.json")
     envs = []
     if os.path.exists(env_path):
@@ -3612,6 +3616,8 @@ def run_environment_endpoint(req: EnvironmentRunRequest):
 @app.get("/api/agent/script")
 def get_agent_script(book_id: Optional[str] = Query(None)):
     """Retrieve all extracted dialogues, voice-overs, and narrator lines for a book."""
+    if not book_id or not get_book_slug(book_id):
+        return {"dialogues": [], "voice_overs": [], "narrator_chunks": [], "narrator_voiceprint": None}
     import dialogue_production_graph
     bible_path = get_book_bible_path(book_id, "script_bible.json")
     data = dialogue_production_graph.load_script_bible(bible_path=bible_path)
@@ -3675,6 +3681,8 @@ def run_script_endpoint(req: ScriptRunRequest):
 @app.get("/api/agent/scenes")
 def get_agent_scenes(book_id: Optional[str] = Query(None)):
     """Retrieve all locked complete scenes for a specific book."""
+    if not book_id or not get_book_slug(book_id):
+        return {"novel_title": "", "scenes": []}
     import scene_production_graph
     bible_path = get_book_bible_path(book_id, "scene_bible.json")
     data = scene_production_graph.load_scene_bible(bible_path=bible_path)
@@ -3737,6 +3745,8 @@ def run_scenes_endpoint(req: SceneRunRequest):
 @app.get("/api/agent/micro_scenes")
 def get_agent_micro_scenes(book_id: Optional[str] = Query(None)):
     """Retrieve all locked 6s-15s micro-scenes / cinematic shots for a book."""
+    if not book_id or not get_book_slug(book_id):
+        return {"novel_title": "", "shots": [], "total_shots": 0, "total_runtime_seconds": 0.0, "total_runtime_formatted": "0m 00s"}
     import micro_scene_production_graph
     bible_path = get_book_bible_path(book_id, "micro_scenes_bible.json")
     data = micro_scene_production_graph.load_micro_scenes_bible(bible_path=bible_path)
@@ -4042,8 +4052,12 @@ def train_novel_brain_endpoint(req: NovelBrainTrainRequest):
 
 @app.get("/api/novel/brain_status")
 def get_novel_brain_status(book_id: str = Query(...)):
+    if not book_id:
+        return {"status": "untrained", "progress": 0, "message": "No novel selected"}
     base_dir = os.path.dirname(os.path.abspath(__file__))
     slug = re.sub(r'[^a-zA-Z0-9_\-]+', '_', book_id).strip('_')
+    if not slug:
+        return {"status": "untrained", "progress": 0, "message": "No novel selected"}
     out_dir = os.path.join(base_dir, "data", "loras", slug)
     status_file = os.path.join(out_dir, "train_status.json")
     meta_file = os.path.join(out_dir, "brain_meta.json")
