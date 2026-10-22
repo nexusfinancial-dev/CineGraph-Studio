@@ -63,6 +63,40 @@ data/storyboard_*.json
 data/reading_history.json
 data/gemini_config.json
 
+# Studio Outputs & Model Training Artifacts
+data/comfy_outputs/
+data/loras/
+data/temp_merged/
+data/test_trainer_out/
+
+# External cloned tools and binary builds
+tools/
+*.pdf
+*.png
+
+# Temporary print & preview files
+test_print.html
+inspect_summary.txt
+
+# Local Catalog Processing Data & Utilities
+detailed_books.json
+epub_metadata_dump.json
+master_131_books.json
+master_books_part*.json
+parsed_original_entries.json
+pdf_extracted.json
+rename_mapping.json
+*ERO*.html
+build_full_catalog_pdf.py
+generate_catalog_data.py
+generate_final_pdf.py
+inspect_books.py
+make_master_data*.py
+rename_files_step.py
+test_catalog_prep.py
+test_print.py
+validate_mapping.py
+
 # GraphRAG Workspaces & Inputs
 graphrag_workspace/.env
 graphrag_workspace/cache/

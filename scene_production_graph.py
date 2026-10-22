@@ -16,8 +16,9 @@ from pydantic import BaseModel, Field
 # LangGraph & LangChain imports
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_openai import ChatOpenAI
 import json_repair
+
+import model_resolver
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -25,15 +26,8 @@ SCENE_BIBLE_PATH = os.path.join(DATA_DIR, "scene_bible.json")
 
 # Local LM Studio Configuration
 LM_STUDIO_BASE_URL = os.environ.get("LM_STUDIO_URL", "http://localhost:1234/v1")
-LLM_MODEL_NAME = os.environ.get("LLM_MODEL", "gemma4-12b-qat-uncensored-hauhaucs-balanced@q4_k_m")
 
-llm = ChatOpenAI(
-    base_url=LM_STUDIO_BASE_URL,
-    api_key="lm-studio",
-    model=LLM_MODEL_NAME,
-    temperature=0.0,
-    request_timeout=60.0
-)
+llm = model_resolver.get_chat_llm(request_timeout=60.0)
 
 # ==========================================
 # 1. Pydantic Strict Schemas
@@ -73,6 +67,7 @@ class SceneBible(BaseModel):
 class SceneAgentState(TypedDict):
     novel_text_path: str
     target_chapter_or_query: Optional[str]
+    max_scenes: Optional[int]
     raw_scene_blocks: List[Dict[str, Any]]
     extracted_scenes: List[Dict[str, Any]]
     is_locked: bool
@@ -89,8 +84,14 @@ def clean_novel_text(text: str) -> str:
     text = text.replace("—", " - ").replace("–", " - ")
     return text
 
-def segment_novel_into_scenes(txt_path: str, max_scenes: int = 12) -> List[Dict[str, Any]]:
-    """Segment novel text into discrete narrative scenes based on transitions, chapters, and time/location shifts."""
+def segment_novel_into_scenes(txt_path: str, max_scenes: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Intelligently segments the novel text into natural cinematic scenes based on:
+    - Chapter markers and section headings
+    - Scene transition delimiters (***, * * *, ---)
+    - Temporal and spatial narrative shifts
+    - Natural narrative pacing beats
+    """
     if not os.path.exists(txt_path):
         return []
 
@@ -98,9 +99,9 @@ def segment_novel_into_scenes(txt_path: str, max_scenes: int = 12) -> List[Dict[
         content = f.read()
 
     cleaned = clean_novel_text(content)
-    raw_paragraphs = [p.strip() for p in cleaned.split("\n\n") if len(p.strip()) > 30]
+    raw_paragraphs = [p.strip() for p in cleaned.split("\n\n") if len(p.strip()) > 25]
 
-    # Filter out TOC and copyright
+    # Filter out TOC, patreon, and copyright boilerplate
     story_paragraphs = []
     found_start = False
     start_markers = ["chapter 1", "chapter one", "prologue", "part 1", "part one", "act 1"]
@@ -108,23 +109,54 @@ def segment_novel_into_scenes(txt_path: str, max_scenes: int = 12) -> List[Dict[
         p_low = p.lower()
         if any(m in p_low for m in start_markers):
             found_start = True
-        if found_start:
-            if "oceanofpdf" not in p_low and "all rights reserved" not in p_low:
+        if found_start or len(raw_paragraphs) < 300:
+            if "oceanofpdf" not in p_low and "patreon" not in p_low and "all rights reserved" not in p_low:
                 story_paragraphs.append(p)
 
     if not story_paragraphs:
-        story_paragraphs = raw_paragraphs[:150]
+        story_paragraphs = raw_paragraphs
 
-    # Cluster paragraphs into scenes of ~15-25 paragraphs each
+    # Intelligent Narrative Scene Boundary Detection
+    TIME_MARKERS = [
+        r'^(the\s+next\s+morning|the\s+next\s+day|hours\s+later|meanwhile|later\s+that|by\s+dawn|the\s+following\s+morning)',
+        r'^(that\s+evening|as\s+night\s+fell|morning\s+came|when\s+the\s+sun|after\s+several\s+hours)',
+        r'^(eventually|finally|at\s+last|some\s+time\s+later|in\s+the\s+distance|outside|back\s+at)'
+    ]
+    transition_regex = re.compile('|'.join(TIME_MARKERS), re.IGNORECASE)
+
     scene_blocks = []
-    chunk_size = 20
-    for idx in range(0, min(len(story_paragraphs), max_scenes * chunk_size), chunk_size):
-        chunk = story_paragraphs[idx:idx + chunk_size]
-        if chunk:
+    current_paras = []
+
+    for p in story_paragraphs:
+        p_str = p.strip()
+        is_break = False
+
+        if p_str in ['***', '* * *', '---', '###']:
+            is_break = True
+        elif re.match(r'^(chapter\s+\d+|chapter\s+[a-z]+|prologue|epilogue|act\s+[ivx\d]+)', p_str, re.IGNORECASE):
+            is_break = True
+        elif len(current_paras) >= 12 and transition_regex.search(p_str):
+            is_break = True
+        elif len(current_paras) >= 28:
+            is_break = True
+
+        if is_break and current_paras:
             scene_blocks.append({
                 "scene_number": len(scene_blocks) + 1,
-                "paragraphs": chunk
+                "paragraphs": current_paras
             })
+            if max_scenes and len(scene_blocks) >= max_scenes:
+                break
+            current_paras = [p_str] if p_str not in ['***', '* * *', '---', '###'] else []
+        else:
+            if p_str not in ['***', '* * *', '---', '###']:
+                current_paras.append(p_str)
+
+    if current_paras and (not max_scenes or len(scene_blocks) < max_scenes):
+        scene_blocks.append({
+            "scene_number": len(scene_blocks) + 1,
+            "paragraphs": current_paras
+        })
 
     return scene_blocks
 
@@ -340,9 +372,10 @@ def lock_scenes_into_bible(scenes: List[CompleteScene], novel_title: str = "", b
 
 def segment_novel_scenes_node(state: SceneAgentState) -> Dict[str, Any]:
     txt_path = state["novel_text_path"]
-    print(f"\n[Node: SegmentScenes] Parsing novel text for scene breaks: {txt_path}...", flush=True)
-    blocks = segment_novel_into_scenes(txt_path)
-    print(f"[SegmentScenes] Segmented manuscript into {len(blocks)} coherent scene sequences.", flush=True)
+    max_sc = state.get("max_scenes")
+    print(f"\n[Node: SegmentScenes] Parsing novel text for natural scene breaks: {txt_path}...", flush=True)
+    blocks = segment_novel_into_scenes(txt_path, max_scenes=max_sc)
+    print(f"[SegmentScenes] Auto-detected {len(blocks)} complete cinematic scenes from narrative flow.", flush=True)
     return {"raw_scene_blocks": blocks}
 
 def extract_complete_scenes_node(state: SceneAgentState) -> Dict[str, Any]:

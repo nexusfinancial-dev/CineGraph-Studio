@@ -333,6 +333,15 @@ def train_novel_lora(
     with open(os.path.join(output_dir, "brain_meta.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
 
+    # Automatically fuse LoRA weights into Base Model and export GGUF for LM Studio
+    print(f"\n[Export] Auto-fusing LoRA with Base Model and exporting to LM Studio...", flush=True)
+    try:
+        from export_novel_to_lmstudio import export_novel_brain_to_lmstudio
+        exp_res = export_novel_brain_to_lmstudio(book_id, outtype="q8_0")
+        print(f"[Export] Successfully fused and placed into LM Studio models ({exp_res.get('gguf_size_mb')} MB)!", flush=True)
+    except Exception as e:
+        print(f"[Export Notice] Auto-export to LM Studio skipped: {e}", flush=True)
+
     safe_write_status(status_file, meta)
 
     print(f"[Success] Trained Novel Brain for '{book_id}' in {elapsed}s! Loss: {meta['train_loss']}", flush=True)

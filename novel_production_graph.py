@@ -13,22 +13,21 @@ from pydantic import BaseModel, Field
 # LangGraph & LangChain imports
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
+
+import model_resolver
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Local LM Studio Configuration
 LM_STUDIO_BASE_URL = os.environ.get("LM_STUDIO_URL", "http://localhost:1234/v1")
-LLM_MODEL_NAME = os.environ.get("LLM_MODEL", "gemma4-12b-qat-uncensored-hauhaucs-balanced@q4_k_m")
 EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL", "text-embedding-bge-m3")
 
-# Initialize Local LangChain Clients
-llm = ChatOpenAI(
-    base_url=LM_STUDIO_BASE_URL,
-    api_key="lm-studio",
-    model=LLM_MODEL_NAME,
-    temperature=0.0
-)
+def resolve_model(book_id: Optional[str] = None) -> str:
+    return model_resolver.get_best_local_uncensored_model(book_id=book_id)
+
+# Initialize dynamic ChatOpenAI client targeting active novel model
+llm = model_resolver.get_chat_llm()
 
 embeddings = OpenAIEmbeddings(
     base_url=LM_STUDIO_BASE_URL,
@@ -113,6 +112,13 @@ def discover_novel_characters(txt_path: str, max_chars: int = 8) -> List[str]:
 
     sampled_text = "\n\n".join(paragraphs[i] for i in sorted(sampled_indices)[:40])
 
+    from pathlib import Path
+    book_id = Path(novel_txt_path).stem if novel_txt_path else None
+    active_model = resolve_model(book_id=book_id)
+    if llm.model_name != active_model:
+        print(f"[DynamicCast] Active Novel Model set to '{active_model}'")
+        llm.model_name = active_model
+
     system_prompt = (
         "You are an expert literary archivist and casting continuity director for a film studio.\n"
         "Your task is to identify the real characters (protagonists, key supporting characters, antagonists) who appear in these novel excerpts.\n"
@@ -195,7 +201,15 @@ def extract_canonical_profile_node(state: ProductionAgentState) -> Dict[str, Any
     char_name = state["character_name"]
     passages = state.get("retrieved_passages", [])
     
-    print(f"\n[Node: ExtractCanonicalProfile] Extracting traits for {char_name} via local LLM...")
+    book_id = None
+    if "novel_text_path" in state and state["novel_text_path"]:
+        from pathlib import Path
+        book_id = Path(state["novel_text_path"]).stem
+    active_model = resolve_model(book_id=book_id)
+    if llm.model_name != active_model:
+        llm.model_name = active_model
+
+    print(f"\n[Node: ExtractCanonicalProfile] Extracting traits for {char_name} via local LLM ({llm.model_name})...")
     evidence_text = "\n\n---\n\n".join(passages[:12])
 
     system_prompt = (
@@ -249,7 +263,15 @@ def detect_conflicts_node(state: ProductionAgentState) -> Dict[str, Any]:
     passages = state.get("retrieved_passages", [])
     conflicts = []
 
-    print(f"\n[Node: DetectConflicts] Checking continuity for {char_name}...")
+    book_id = None
+    if "novel_text_path" in state and state["novel_text_path"]:
+        from pathlib import Path
+        book_id = Path(state["novel_text_path"]).stem
+    active_model = resolve_model(book_id=book_id)
+    if llm.model_name != active_model:
+        llm.model_name = active_model
+
+    print(f"\n[Node: DetectConflicts] Checking continuity for {char_name} via {llm.model_name}...")
 
     if passages and identity:
         try:
@@ -428,6 +450,14 @@ def compile_visual_prompts_node(state: ProductionAgentState) -> Dict[str, Any]:
     # Use LLM to cleanly synthesize canonical costumes from novel evidence
     wardrobe_list = []
     evidence_text = "\n\n".join(passages[:10])
+    
+    book_id = None
+    if "novel_text_path" in state and state["novel_text_path"]:
+        from pathlib import Path
+        book_id = Path(state["novel_text_path"]).stem
+    active_model = resolve_model(book_id=book_id)
+    if llm.model_name != active_model:
+        llm.model_name = active_model
     
     wardrobe_prompt = (
         f"You are a costume designer for a film adaptation of this novel.\n"

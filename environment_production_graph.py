@@ -14,24 +14,18 @@ from pydantic import BaseModel, Field
 # LangGraph & LangChain imports
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
+
+import model_resolver
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Local LM Studio Configuration
 LM_STUDIO_BASE_URL = os.environ.get("LM_STUDIO_URL", "http://localhost:1234/v1")
-LLM_MODEL_NAME = os.environ.get("LLM_MODEL", "gemma4-12b-qat-uncensored-hauhaucs-balanced@q4_k_m")
 EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL", "text-embedding-bge-m3")
 
-# Initialize Local LangChain Clients
-llm = ChatOpenAI(
-    base_url=LM_STUDIO_BASE_URL,
-    api_key="lm-studio",
-    model=LLM_MODEL_NAME,
-    temperature=0.0,
-    request_timeout=120.0,
-    max_retries=1
-)
+# Initialize Local LangChain Clients targeting active novel model
+llm = model_resolver.get_chat_llm(request_timeout=120.0)
 
 # ==========================================
 # 1. Pydantic Strict Schemas (Deterministic)
@@ -107,7 +101,15 @@ def extract_canonical_environment_node(state: EnvironmentAgentState) -> Dict[str
     loc_name = state["location_name"]
     passages = state.get("retrieved_passages", [])
     
-    print(f"\n[Node: ExtractCanonicalEnvironment] Extracting architecture and atmosphere for {loc_name}...", flush=True)
+    book_id = None
+    if "novel_text_path" in state and state["novel_text_path"]:
+        from pathlib import Path
+        book_id = Path(state["novel_text_path"]).stem
+    active_model = model_resolver.get_best_local_uncensored_model(book_id=book_id)
+    if llm.model_name != active_model:
+        llm.model_name = active_model
+
+    print(f"\n[Node: ExtractCanonicalEnvironment] Extracting architecture and atmosphere for {loc_name} via {llm.model_name}...", flush=True)
     evidence_text = "\n\n---\n\n".join(passages)
 
     system_prompt = (
@@ -316,7 +318,11 @@ def discover_novel_locations(txt_path: str, max_locs: int = 6) -> List[str]:
     )
 
     try:
-        from novel_production_graph import llm
+        from pathlib import Path
+        book_id = Path(novel_txt_path).stem if novel_txt_path else None
+        active_model = model_resolver.get_best_local_uncensored_model(book_id=book_id)
+        if llm.model_name != active_model:
+            llm.model_name = active_model
         res = llm.invoke([
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Extract the primary locations from this manuscript:\n\n{sampled_text[:8000]}"}

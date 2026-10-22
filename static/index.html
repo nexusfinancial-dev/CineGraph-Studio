@@ -4267,6 +4267,7 @@
           // Load database scoped strictly to this book
           await loadDatabase(b.id);
           await loadStoryboard(b.id);
+          await fetchEngineStatus();
           await pollBatchStatus();
           pollFaceBatchStatus();
           pollOutfitBatchStatus();
@@ -4837,7 +4838,8 @@
 
         const fetchEngineStatus = async () => {
           try {
-            const res = await fetch('/api/status');
+            const url = selectedBookId.value ? `/api/status?book_id=${encodeURIComponent(selectedBookId.value)}` : '/api/status';
+            const res = await fetch(url);
             const data = await res.json();
             geminiStatus.value = {
               agy_connected: data.agy_connected,

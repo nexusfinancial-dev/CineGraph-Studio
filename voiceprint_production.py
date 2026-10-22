@@ -11,11 +11,12 @@ import re
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 
+import model_resolver
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Local LM Studio Configuration
 LM_STUDIO_BASE_URL = os.environ.get("LM_STUDIO_URL", "http://localhost:1234/v1")
-LLM_MODEL_NAME = os.environ.get("LLM_MODEL", "gemma4-12b-qat-uncensored-hauhaucs-balanced@q4_k_m")
 
 class CanonicalVoiceprint(BaseModel):
     character_name: str = Field(description="Name of the character")
@@ -132,11 +133,16 @@ def get_precomputed_canonical_voiceprint(char_name: str, txt_path: Optional[str]
 
     return None
 
-def extract_or_design_voiceprint(char_name: str, txt_path: str) -> CanonicalVoiceprint:
+def extract_or_design_voiceprint(char_name: str, txt_path: str, book_id: Optional[str] = None, model_name: Optional[str] = None) -> CanonicalVoiceprint:
     """Extract or design voiceprint using local LLM with deterministic novel fallback."""
     precomputed = get_precomputed_canonical_voiceprint(char_name, txt_path=txt_path)
     if precomputed:
         return precomputed
+
+    from pathlib import Path
+    resolved_book = book_id or (Path(txt_path).stem if txt_path else None)
+    active_model = model_name or model_resolver.get_best_local_uncensored_model(book_id=resolved_book)
+    print(f"[Voiceprint] Designing acoustic profile for {char_name} via model '{active_model}'...", flush=True)
 
     # For dynamic novel characters not in the primary trio:
     dialogue_paragraphs = extract_character_dialogue_passages(char_name, txt_path, max_passages=4)
@@ -147,7 +153,7 @@ def extract_or_design_voiceprint(char_name: str, txt_path: str) -> CanonicalVoic
         llm = ChatOpenAI(
             base_url=LM_STUDIO_BASE_URL,
             api_key="lm-studio",
-            model=LLM_MODEL_NAME,
+            model=active_model,
             temperature=0.0,
             request_timeout=60.0,
             max_retries=1

@@ -68,11 +68,12 @@ Generative AI video models (Runway, Kling, Sora, MiniMax H3) have unlocked hyper
 * **Sensory Ambiance:** Records olfactory, auditory, and climatic details (e.g., *ionized rain, ozone hum, humid subterranean heat*).
 * **Cinematic Matte Plate Prompts:** Formats prompts specifically for wide 24mm anamorphic cinema lenses with volumetric depth and zero character contamination.
 
-### 3. 🎙️ 5-Dimension Acoustic Voice Design (Qwen3-TTS / CosyVoice)
+### 3. 🎙️ 5-Dimension Acoustic Voice Design & Standalone Neural TTS Engine
 * **The 5-Dimension Formula:** Formulates character voiceprints strictly conforming to:
   $$\text{Voiceprint} = [\text{Persona and Age}] + [\text{Timbre and Pitch}] + [\text{Pacing and Cadence}] + [\text{Emotional Baseline}] + [\text{Microphone Acoustics}]$$
 * **Verbatim English Dialogue Samples:** Extracts actual spoken lines in the novel's original English.
 * **Line-by-Line Performance Directives:** Prepends nuanced performance instructions (e.g., `[Instruction: Seductive whisper with slight vocal fry, dry close-mic studio recording, zero reverb]`).
+* **Standalone High-Speed Neural TTS Engine:** Integrated `edge-tts` synthesis engine delivering studio-grade MP3 auditions directly from the character cards, dialogue script, and cinematic shots without relying on external ComfyUI nodes. Smart vocal mapping matches deep baritones, soft elven tones, goblins, and narrators across English and Arabic manuscripts.
 
 ### 4. 💬 Dialogue, Voice-Over (V.O.) & Narrator Screenplay Extraction
 * **Spoken Dialogues:** Extracts character-to-character conversations aloud on screen, complete with speaker attribution, addressee tags, emotional subtext, and acting performance directives `[Instruction: ...]`. All preserved in original novel English.
@@ -100,6 +101,11 @@ Generative AI video models (Runway, Kling, Sora, MiniMax H3) have unlocked hyper
 ### 7. ⚖️ Human-in-the-Loop (HITL) Conflict Arbitration
 * When the manuscript contains contradictory descriptions (e.g., green-skinned nymph vs. human camouflage, or eye color variance under different lighting), the LangGraph engine halts execution and flags the discrepancy.
 * The director resolves the ambiguity via the interactive UI modal before the canonical bible is permanently locked.
+
+### 8. 🧠 Dynamic Model Resolver & Automated Novel Brain GGUF Pipeline
+* **Autonomous Model Routing (`model_resolver.py`):** Automatically detects fine-tuned novel models loaded in LM Studio and routes all extraction graphs directly to the specialized brain.
+* **LoRA Merge & GGUF Quantization (`export_novel_to_lmstudio.py`):** One-click automated pipeline merging PEFT adapters with 16-bit base weights, quantizing to high-speed `Q4_K_M` GGUF, and deploying straight into LM Studio's model cache for instant 40+ tokens/sec GPU inference.
+* **Algorithmic Scene Segmentation:** Eliminates manual scene guessing by parsing chapter markers, transition tokens, and pacing beats into 100% canonical scenes.
 
 ---
 

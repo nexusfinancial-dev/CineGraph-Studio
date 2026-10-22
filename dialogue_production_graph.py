@@ -15,22 +15,16 @@ from pydantic import BaseModel, Field
 # LangGraph & LangChain imports
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_openai import ChatOpenAI
 import json_repair
+
+import model_resolver
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Local LM Studio Configuration
 LM_STUDIO_BASE_URL = os.environ.get("LM_STUDIO_URL", "http://localhost:1234/v1")
-LLM_MODEL_NAME = os.environ.get("LLM_MODEL", "gemma4-12b-qat-uncensored-hauhaucs-balanced@q4_k_m")
 
-llm = ChatOpenAI(
-    base_url=LM_STUDIO_BASE_URL,
-    api_key="lm-studio",
-    model=LLM_MODEL_NAME,
-    temperature=0.0,
-    request_timeout=60.0
-)
+llm = model_resolver.get_chat_llm(request_timeout=60.0)
 
 # ==========================================
 # 1. Pydantic Schemas
@@ -260,8 +254,11 @@ def parse_deterministic_script(paragraphs: List[str], target_char: Optional[str]
 # 3. LLM Structured Extraction Node
 # ==========================================
 
-def run_llm_script_extraction(passages: List[str], target_char: Optional[str] = None, scope: str = "all") -> AudioScriptBible:
+def run_llm_script_extraction(passages: List[str], target_char: Optional[str] = None, scope: str = "all", book_id: Optional[str] = None) -> AudioScriptBible:
     """Use Local LM Studio to extract high-fidelity spoken dialogue, VO, and narrator chunks."""
+    active_model = model_resolver.get_best_local_uncensored_model(book_id=book_id)
+    if llm.model_name != active_model:
+        llm.model_name = active_model
     evidence_text = "\n\n---\n\n".join(passages[:8])
     
     char_constraint = f"Focus particularly on exchanges involving: '{target_char}'." if target_char else ""
@@ -459,8 +456,9 @@ def extract_script_node(state: ScriptAgentState) -> Dict[str, Any]:
 def lock_script_node(state: ScriptAgentState) -> Dict[str, Any]:
     extracted_data = state.get("extracted_script", {})
     script_obj = AudioScriptBible(**extracted_data)
-    merged = merge_and_lock_script(script_obj)
-    print(f"[Node: LockScript] Successfully locked script into {SCRIPT_BIBLE_PATH}", flush=True)
+    target_bible = state.get("bible_path") or SCRIPT_BIBLE_PATH
+    merged = merge_and_lock_script(script_obj, bible_path=target_bible)
+    print(f"[Node: LockScript] Successfully locked script into {target_bible}", flush=True)
     return {"is_locked": True}
 
 def build_script_pipeline_graph():

@@ -81,7 +81,7 @@
       <!-- LM Studio Status -->
       <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-900 border border-gray-800 text-[11px]">
         <span class="w-2 h-2 rounded-full" :class="lmOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
-        <span class="text-gray-300 font-medium font-mono">LM Studio: {{ lmOnline ? 'gemma-4-12b' : 'Offline' }}</span>
+        <span class="text-gray-300 font-medium font-mono">LM Studio: {{ lmOnline ? (activeModelName ? activeModelName.split('@')[0] : 'Online') : 'Offline' }}</span>
       </div>
 
       <!-- ComfyUI Status -->
@@ -197,6 +197,49 @@
             </div>
 
             <span class="text-[9px] text-purple-200/90 font-mono line-clamp-1 italic">{{ brainStatus.message || 'Executing QLoRA fine-tuning...' }}</span>
+          </div>
+
+          <!-- Fused Novel Brain (LM Studio GGUF 50+ tok/s) -->
+          <div v-if="brainStatus.status === 'completed'" class="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-700/60 text-[10px] flex flex-col gap-1.5 shadow-inner">
+            <div class="flex justify-between items-center">
+              <span class="text-emerald-300 font-bold flex items-center gap-1">
+                <span>🧠 Novel Brain (Fused GGUF):</span>
+              </span>
+              <span v-if="brainStatus.is_active_in_lmstudio" class="text-emerald-300 font-bold bg-emerald-900/80 px-2 py-0.5 rounded-full border border-emerald-500/50 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                ACTIVE in LM Studio (50+ tok/s)
+              </span>
+              <span v-else-if="brainStatus.has_gguf" class="text-sky-300 bg-sky-950/80 px-2 py-0.5 rounded-full border border-sky-700/50">
+                GGUF Ready in LM Studio ({{ brainStatus.gguf_size_mb }} MB)
+              </span>
+              <span v-else class="text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-700/50">
+                LoRA Trained (Needs Fuse & Export)
+              </span>
+            </div>
+            
+            <div class="text-[9px] text-emerald-200/80">
+              Fuses LoRA adapter into Hermes 3 weights and converts to GGUF inside LM Studio for 50-80 tokens/sec GPU inference.
+            </div>
+
+            <div class="flex gap-1.5 mt-0.5">
+              <button 
+                v-if="!brainStatus.has_gguf"
+                @click="exportToLMStudio"
+                :disabled="isExportingGGUF"
+                class="flex-1 py-1 px-2.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-[10px] transition shadow flex items-center justify-center gap-1">
+                <span v-if="isExportingGGUF">⚙️ Fusing & Converting GGUF (~60s)...</span>
+                <span v-else>🚀 Fuse & Export to LM Studio</span>
+              </button>
+              
+              <button 
+                v-else-if="!brainStatus.is_active_in_lmstudio"
+                @click="loadLMStudioModel"
+                :disabled="isLoadingLMStudioModel"
+                class="flex-1 py-1 px-2.5 rounded bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-[10px] transition shadow flex items-center justify-center gap-1">
+                <span v-if="isLoadingLMStudioModel">⏳ Loading into GPU...</span>
+                <span v-else>⚡ Load into LM Studio GPU Now</span>
+              </button>
+            </div>
           </div>
 
           <!-- LM Studio Hermes 3 Status -->
@@ -335,15 +378,22 @@
 
         <!-- Complete Scenes Scope Details -->
         <div v-else-if="targetType === 'scenes'" class="flex flex-col gap-2">
-          <div class="flex flex-col gap-1">
-            <div class="flex justify-between text-[11px] text-gray-400">
-              <span class="font-medium">Target Scenes Count:</span>
-              <span class="font-bold text-rose-400 font-mono">{{ sceneCountTarget }} Scenes</span>
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between items-center text-[11px]">
+              <span class="font-medium text-gray-400">Segmentation Mode:</span>
+              <span class="font-bold text-emerald-400 font-mono">✨ 100% Auto-Detect</span>
             </div>
-            <input type="range" v-model.number="sceneCountTarget" min="3" max="25" step="1" class="w-full accent-rose-500 bg-gray-800 rounded-lg cursor-pointer" />
+            <div class="grid grid-cols-2 gap-1.5">
+              <button type="button" @click="sceneScope = 'all'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1', sceneScope === 'all' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/60' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white']">
+                📖 Full Novel (All Scenes)
+              </button>
+              <button type="button" @click="sceneScope = 'preview'" :class="['py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1', sceneScope === 'preview' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/60' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white']">
+                ⚡ Fast Preview (10)
+              </button>
+            </div>
           </div>
           <p class="text-[10px] text-rose-300/80 italic">
-            Segments manuscript into full Hollywood scene sequences with sluglines, active cast, action beats, dialogue flows, soundscapes, and 24mm ComfyUI keyframes.
+            Automatically parses entire manuscript into complete cinematic scene sequences with sluglines, active cast, action beats, dialogue flows, soundscapes, and matte painting keyframes. Zero manual guesswork required.
           </p>
         </div>
 
@@ -393,7 +443,7 @@
       <div class="mt-auto p-3 rounded-xl bg-gray-950/60 border border-gray-800 text-[11px] text-gray-500 flex flex-col gap-1">
         <div class="flex justify-between"><span>Rules Engine:</span> <span class="text-amber-400 font-bold">Pydantic Schemas</span></div>
         <div class="flex justify-between"><span>Vector Embeddings:</span> <span class="text-gray-300 font-mono">BGE-M3 (8192 ctx, 1024d)</span></div>
-        <div class="flex justify-between"><span>Inference Engine:</span> <span class="text-gray-300 font-mono">Gemma 12B / DeepSeek 32B</span></div>
+        <div class="flex justify-between"><span>Inference Engine:</span> <span class="text-gray-300 font-mono">{{ activeModelName ? activeModelName.split('@')[0] : 'Fused Novel Brain' }}</span></div>
         <div class="flex justify-between"><span>ComfyUI Studio:</span> <span class="text-gray-300 font-mono">Portraits & Matte Plates</span></div>
       </div>
     </aside>
@@ -714,11 +764,22 @@
                   <span>🗣️ Original English Dialogue & Performance Directives:</span>
                 </span>
                 <div class="space-y-1.5 max-h-40 overflow-y-auto">
-                  <div v-for="(sample, sIdx) in char.voiceprint.canonical_dialogue_samples" :key="sIdx" class="p-2 rounded-lg bg-black/60 border border-gray-800 text-[11px] font-mono text-gray-200 flex items-start justify-between gap-2 group hover:border-purple-500/50 transition">
-                    <span class="leading-relaxed">{{ sample }}</span>
-                    <button @click="copyPrompt(sample)" class="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 hover:text-white text-[10px] transition shrink-0" title="Copy Dialogue Line">
-                      📋
-                    </button>
+                  <div v-for="(sample, sIdx) in char.voiceprint.canonical_dialogue_samples" :key="sIdx" class="p-2 rounded-lg bg-black/60 border border-gray-800 text-[11px] font-mono text-gray-200 flex flex-col gap-1.5 group hover:border-purple-500/50 transition">
+                    <div class="flex items-start justify-between gap-2">
+                      <span class="leading-relaxed">{{ sample }}</span>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button @click="renderCharacterVoiceSample(char.name, sample, char.name + '_' + sIdx)" :disabled="renderingVoices[char.name + '_' + sIdx]?.status === 'rendering'" class="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-700 text-purple-200 text-[10px] font-bold transition flex items-center gap-1" title="Synthesize Voice">
+                          <span v-if="renderingVoices[char.name + '_' + sIdx]?.status === 'rendering'" class="animate-spin text-[9px]">⏳</span>
+                          <span v-else>🎙️ Speak</span>
+                        </button>
+                        <button @click="copyPrompt(sample)" class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 hover:text-white text-[10px] transition shrink-0" title="Copy Dialogue Line">
+                          📋
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="renderingVoices[char.name + '_' + sIdx]?.status === 'success'" class="mt-1">
+                      <audio controls class="w-full h-6" :src="renderingVoices[char.name + '_' + sIdx].primary_audio"></audio>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -971,10 +1032,10 @@
                 <span class="flex items-center gap-1">🎙️ Performance Directive (Qwen3-TTS Voice Design):</span>
                 <div class="flex items-center gap-2">
                   <button @click="copyPrompt(item.performance_instruction + ' ' + item.line_en)" class="text-sky-400 hover:text-sky-300 font-semibold">Copy Line</button>
-                  <button @click="renderScriptLineVoice(item)" :disabled="renderingVoices[item.id]?.status === 'rendering' || !comfyOnline" class="px-2.5 py-1 rounded bg-teal-500/20 hover:bg-teal-500 text-teal-300 hover:text-gray-950 text-[11px] font-bold transition flex items-center gap-1 disabled:opacity-50">
+                  <button @click="renderScriptLineVoice(item)" :disabled="renderingVoices[item.id]?.status === 'rendering'" class="px-2.5 py-1 rounded bg-teal-500/20 hover:bg-teal-500 text-teal-300 hover:text-gray-950 text-[11px] font-bold transition flex items-center gap-1 disabled:opacity-50">
                     <span v-if="renderingVoices[item.id]?.status === 'rendering'" class="animate-spin text-[10px]">⏳</span>
                     <span v-else>🎙️</span>
-                    <span>{{ renderingVoices[item.id]?.status === 'rendering' ? 'Synthesizing...' : 'Render Voice (Qwen3-TTS)' }}</span>
+                    <span>{{ renderingVoices[item.id]?.status === 'rendering' ? 'Synthesizing...' : 'Render Voice (.mp3)' }}</span>
                   </button>
                 </div>
               </div>
@@ -1273,10 +1334,10 @@
                   <button @click="copyPrompt(sh.dialogue.performance_instruction + ' ' + sh.dialogue.line_en)" class="text-[11px] text-sky-400 hover:text-sky-300 font-medium flex items-center gap-1">
                     <span>📋 Copy</span>
                   </button>
-                  <button @click="renderShotVoice(sh)" :disabled="renderingVoices[sh.shot_code]?.status === 'rendering' || !comfyOnline" class="px-2.5 py-1 rounded bg-teal-500/20 hover:bg-teal-500 text-teal-300 hover:text-gray-950 text-xs font-bold transition flex items-center gap-1 disabled:opacity-50">
+                  <button @click="renderShotVoice(sh)" :disabled="renderingVoices[sh.shot_code]?.status === 'rendering'" class="px-2.5 py-1 rounded bg-teal-500/20 hover:bg-teal-500 text-teal-300 hover:text-gray-950 text-xs font-bold transition flex items-center gap-1 disabled:opacity-50">
                     <span v-if="renderingVoices[sh.shot_code]?.status === 'rendering'" class="animate-spin text-xs">⏳</span>
                     <span v-else>🎙️</span>
-                    <span>{{ renderingVoices[sh.shot_code]?.status === 'rendering' ? 'Synthesizing...' : 'Render Voice (Qwen3-TTS)' }}</span>
+                    <span>{{ renderingVoices[sh.shot_code]?.status === 'rendering' ? 'Synthesizing...' : 'Render Voice (.mp3)' }}</span>
                   </button>
                 </div>
               </div>
@@ -1458,6 +1519,7 @@ const { createApp, ref, computed, onMounted, nextTick } = Vue;
 createApp({
   setup() {
     const lmOnline = ref(true);
+    const activeModelName = ref('');
     const embedOnline = ref(true);
     const comfyOnline = ref(false);
     const activeTab = ref('pipeline');
@@ -1513,7 +1575,7 @@ createApp({
     const lockedEnvironments = ref([]);
     const pendingConflicts = ref([]);
     const lockedScenes = ref([]);
-    const sceneCountTarget = ref(12);
+    const sceneScope = ref('all');
 
     // Micro-Scenes / Takes Scope & State (6s - 15s, 2 words/sec)
     const lockedShots = ref([]);
@@ -1825,7 +1887,8 @@ createApp({
 
       // Step 3: LangGraph Extraction
       pipelineSteps.value[2].status = 'active';
-      addLog(`[Node: LangGraph] Calling Gemma-4 12B with Pydantic strict schemas for ${domainName}...`);
+      const currentModel = activeModelName.value ? activeModelName.value.split('@')[0] : 'Fused Novel Model';
+      addLog(`[Node: LangGraph] Calling ${currentModel} on GPU with Pydantic strict schemas for ${domainName}...`);
 
       try {
         if (targetType.value === 'character') {
@@ -1878,7 +1941,8 @@ createApp({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               book_id: selectedBook.value,
-              scene_count: parseInt(sceneCountTarget.value) || 12
+              scope: sceneScope.value,
+              max_scenes: sceneScope.value === 'preview' ? 10 : 0
             })
           });
           const data = await res.json();
@@ -2148,6 +2212,32 @@ createApp({
       }
     };
 
+    const renderCharacterVoiceSample = async (charName, sampleLine, key) => {
+      renderingVoices.value[key] = { status: 'rendering' };
+      addLog(`[Voice Synthesis] Generating neural voice for ${charName}...`);
+      try {
+        const res = await fetch('/api/comfy/generate_voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            character_name: charName,
+            line_en: sampleLine,
+            voice_description: "Natural character voice",
+            shot_code: key
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.primary_audio) {
+          renderingVoices.value[key] = { status: 'success', primary_audio: data.primary_audio };
+          addLog(`[Voice Success] Spoken audio ready for ${charName}: ${data.primary_audio}`);
+        } else {
+          renderingVoices.value[key] = { status: 'error', error: data.error || 'Failed' };
+        }
+      } catch (e) {
+        renderingVoices.value[key] = { status: 'error', error: e.message };
+      }
+    };
+
     const renderCharacterPortrait = async (char) => {
       const key = char.name;
       renderingPortraits.value[key] = { status: 'rendering' };
@@ -2313,6 +2403,16 @@ createApp({
         const res = await fetch('/api/novel/hermes_status');
         const data = await res.json();
         hermesStatus.value = data;
+
+        // Fetch active novel model from /api/status
+        const statusRes = await fetch(`/api/status${selectedBook.value ? '?book_id=' + encodeURIComponent(selectedBook.value) : ''}`);
+        if (statusRes.ok) {
+          const sData = await statusRes.json();
+          if (sData.uncensored_model) {
+            activeModelName.value = sData.uncensored_model;
+          }
+          lmOnline.value = sData.lm_studio_connected;
+        }
       } catch (e) {
         console.error("Error checking hermes status:", e);
       }
@@ -2360,6 +2460,62 @@ createApp({
       }
     };
 
+    const isExportingGGUF = ref(false);
+    const isLoadingLMStudioModel = ref(false);
+
+    const exportToLMStudio = async () => {
+      if (!selectedBook.value) return;
+      isExportingGGUF.value = true;
+      activeTab.value = 'pipeline';
+      addLog(`[LM Studio Pipeline] Starting weight fusion and GGUF quantization for "${selectedBook.value}"...`);
+      try {
+        const res = await fetch('/api/novel/export_to_lmstudio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ book_id: selectedBook.value, outtype: 'q8_0' })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          addLog(`[LM Studio Success] 🚀 Merged GGUF created (${data.gguf_size_mb} MB) and exported to LM Studio models!`);
+          if (data.loaded_in_lmstudio) {
+            addLog(`[LM Studio Success] ⚡ Model "${data.slug}" successfully LOADED into LM Studio GPU! Ready at 60-80 tok/s.`);
+          }
+          await checkBrainStatus();
+        } else {
+          addLog(`[LM Studio Error] ${data.detail || 'Export failed'}`);
+        }
+      } catch (err) {
+        addLog(`[LM Studio Error] ${err.message}`);
+      } finally {
+        isExportingGGUF.value = false;
+      }
+    };
+
+    const loadLMStudioModel = async () => {
+      if (!selectedBook.value) return;
+      isLoadingLMStudioModel.value = true;
+      const slug = selectedBook.value.replace(/[^a-zA-Z0-9_\-]+/g, '_').replace(/^_+|_+$/g, '');
+      addLog(`[LM Studio] Loading "${slug}" into GPU memory via lms CLI...`);
+      try {
+        const res = await fetch('/api/novel/load_lmstudio_model', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model_identifier: slug })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          addLog(`[LM Studio Success] 🚀 Model "${slug}" is now ACTIVE in LM Studio GPU! (60-80 tok/s)`);
+          await checkBrainStatus();
+        } else {
+          addLog(`[LM Studio Error] ${data.detail || 'Load failed'}`);
+        }
+      } catch (err) {
+        addLog(`[LM Studio Error] ${err.message}`);
+      } finally {
+        isLoadingLMStudioModel.value = false;
+      }
+    };
+
     onMounted(async () => {
       setupDialogFallback(document.getElementById('resetModal'));
       await fetchBooks();
@@ -2381,7 +2537,7 @@ createApp({
       envExecutionMode, targetLocationName,
       scriptScope, scriptCharacter, scriptFilter, scriptData, filteredScriptItems,
       getSpeakerBadgeClass, exportScriptJson, fetchScriptData,
-      lockedScenes, sceneCountTarget, exportScenesJson, fetchLockedScenes,
+      lockedScenes, sceneScope, exportScenesJson, fetchLockedScenes,
       lockedShots, microScenesBible, selectedSceneFilter, shotTypeFilter,
       minDurationTarget, maxDurationTarget, speechPacingRate, filteredShots,
       getDurationBadgeClass, exportShotsJson, fetchLockedMicroScenes,
@@ -2389,10 +2545,12 @@ createApp({
       pipelineSteps, logs, logContainer, clearLogs, getLogColor, getStepClass, getStepIcon,
       lockedCharacters, lockedEnvironments, pendingConflicts, openResetModal, closeResetModal,
       executeStudioReset, runProductionAgent, resolveConflict, copyPrompt,
+      activeModelName,
       brainStatus, hermesStatus, isTrainingBrain, checkBrainStatus, checkHermesStatus, trainNovelBrain, loadHermesToLMStudio,
+      isExportingGGUF, isLoadingLMStudioModel, exportToLMStudio, loadLMStudioModel,
       renderingPortraits, renderingOutfits, renderCharacterPortrait, renderCharacterOutfit,
       renderingVoices, renderingKeyframes, renderingVideos, renderingEnvs, activeShotPromptTab,
-      renderShotVoice, renderShotKeyframe, renderShotVideo, renderEnvironmentMatte, renderScriptLineVoice,
+      renderShotVoice, renderShotKeyframe, renderShotVideo, renderEnvironmentMatte, renderScriptLineVoice, renderCharacterVoiceSample,
       fileInput, isUploading, handleFileUpload
     };
   }

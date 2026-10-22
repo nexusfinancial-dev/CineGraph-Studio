@@ -121,6 +121,15 @@ def main():
     print("#"*65, flush=True)
 
     txt_path = resolve_novel_text(args.book)
+
+    import model_resolver
+    active_novel_model = model_resolver.get_best_local_uncensored_model(book_id=args.book)
+    os.environ["LLM_MODEL"] = active_novel_model
+    import novel_production_graph
+    if hasattr(novel_production_graph, "llm"):
+        novel_production_graph.llm.model_name = active_novel_model
+    print(f"[Runner] Configured Local Novel Model: {active_novel_model}", flush=True)
+
     app = build_production_graph()
 
     if args.character:

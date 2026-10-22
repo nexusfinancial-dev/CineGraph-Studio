@@ -94,31 +94,13 @@ def save_db(data: Dict[str, Any], book_id: Optional[str] = None):
 
 epub_cache = {}
 
-def get_best_local_uncensored_model() -> str:
-    try:
-        r = requests.get(f"{LM_STUDIO_URL}/models", timeout=3)
-        if r.status_code == 200:
-            models = [m.get("id") for m in r.json().get("data", [])]
-            for m in models:
-                if "hermes" in m.lower():
-                    return m
-            for m in models:
-                if "uncensored" in m.lower() and "26b" in m.lower() and "@?" not in m:
-                    return m
-            for m in models:
-                if "uncensored" in m.lower() and "@?" not in m:
-                    return m
-            for m in models:
-                if "uncensored" in m.lower():
-                    return m
-            if models:
-                return models[0]
-    except Exception:
-        pass
-    return "gemma4-12b-qat-uncensored-hauhaucs-balanced@q4_k_m"
+import model_resolver
+
+def get_best_local_uncensored_model(book_id: Optional[str] = None) -> str:
+    return model_resolver.get_best_local_uncensored_model(book_id=book_id)
 
 @app.get("/api/status")
-def get_status():
+def get_status(book_id: Optional[str] = None):
     lm_status = False
     models = []
     try:
@@ -139,8 +121,8 @@ def get_status():
     elif api_key_set:
         active_engine = "Google AI Studio API Key"
 
-    uncensored_model = get_best_local_uncensored_model() if lm_status else None
-    has_uncensored = bool(any("uncensored" in m.lower() for m in models)) if lm_status else False
+    uncensored_model = get_best_local_uncensored_model(book_id=book_id) if lm_status else None
+    has_uncensored = bool(any("uncensored" in m.lower() for m in models) or any("novelbrain" in m.lower() or "daggers" in m.lower() or "succubus" in m.lower() for m in models)) if lm_status else False
 
     return {
         "lm_studio_connected": lm_status,
@@ -658,7 +640,7 @@ Chapter Text:
 """
 
     payload = {
-        "model": "gemma4-12b-qat-uncensored-hauhaucs-balanced@q4_k_m",
+        "model": get_best_local_uncensored_model(),
         "messages": [
             {"role": "system", "content": "You are a Hollywood script breakdown supervisor. Output valid JSON only. Keep descriptions visual, punchy, and complete without truncating."},
             {"role": "user", "content": prompt}
@@ -715,6 +697,17 @@ Chapter Text:
 # --- FULL BOOK SCAN PIPELINE (GEMINI 2.0 / 3.8 FLASH VIA AGY OR REST) ---
 
 def extract_full_novel_text(book_id: str, max_chars: Optional[int] = None) -> str:
+    # Priority 0: Check pre-extracted clean manuscript in graphrag_workspace/input/
+    workspace_txt = os.path.join(os.path.dirname(os.path.abspath(__file__)), "graphrag_workspace", "input", f"{book_id}.txt")
+    if os.path.exists(workspace_txt):
+        try:
+            with open(workspace_txt, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read().strip()
+                if len(content) > 1000:
+                    return content[:max_chars] if max_chars else content
+        except Exception:
+            pass
+
     book_path = find_book_path(book_id)
     if not book_path or not os.path.exists(book_path):
         raise HTTPException(status_code=404, detail=f"Book file not found: {book_id}")
@@ -754,8 +747,8 @@ def extract_full_novel_text(book_id: str, max_chars: Optional[int] = None) -> st
             except Exception:
                 pass
         
-        if not ordered_files:
-            ordered_files = html_files
+        if not ordered_files or (len(ordered_files) < 3 and len(html_files) > 3):
+            ordered_files = sorted(html_files)
 
         cur_chars = 0
         for hf in ordered_files:
@@ -839,8 +832,13 @@ def call_gemini_engine(prompt: str, model: str = "gemini-3.8-flash-low") -> str:
 
     raise RuntimeError("No Gemini engine available. Antigravity CLI not found and no API key configured.")
 
-def call_local_uncensored_engine(prompt: str, model: Optional[str] = None) -> str:
-    chosen_model = model or get_best_local_uncensored_model()
+def call_local_uncensored_engine(prompt: str, model: Optional[str] = None, book_id: Optional[str] = None) -> str:
+    # If model is unspecified or set to base hermes, dynamically resolve book-specific model
+    if not model or "hermes" in model.lower():
+        chosen_model = get_best_local_uncensored_model(book_id=book_id)
+    else:
+        chosen_model = model
+    print(f"[LM Studio Engine] 🚀 Processing inference via '{chosen_model}' on GPU CUDA...", flush=True)
     payload = {
         "model": chosen_model,
         "messages": [
@@ -866,22 +864,28 @@ def call_local_uncensored_engine(prompt: str, model: Optional[str] = None) -> st
     content = choice["message"].get("content") or choice["message"].get("reasoning_content") or ""
     return content.strip()
 
-def chunk_text(text: str, max_chunk_size: int = 35000) -> List[str]:
-    chapters = text.split("=== NEXT CHAPTER ===")
+def chunk_text(text: str, max_chunk_size: int = 12000) -> List[str]:
+    if "=== NEXT CHAPTER ===" in text:
+        parts = text.split("=== NEXT CHAPTER ===")
+        delim = "\n\n=== NEXT CHAPTER ===\n\n"
+    else:
+        parts = [p.strip() for p in text.split("\n\n") if p.strip()]
+        delim = "\n\n"
+
     chunks = []
     current_chunk = []
     current_len = 0
-    for ch in chapters:
-        ch_len = len(ch)
-        if current_len + ch_len > max_chunk_size and current_chunk:
-            chunks.append("\n\n=== NEXT CHAPTER ===\n\n".join(current_chunk))
-            current_chunk = [ch]
-            current_len = ch_len
+    for p in parts:
+        p_len = len(p)
+        if current_len + p_len > max_chunk_size and current_chunk:
+            chunks.append(delim.join(current_chunk))
+            current_chunk = [p]
+            current_len = p_len
         else:
-            current_chunk.append(ch)
-            current_len += ch_len
+            current_chunk.append(p)
+            current_len += p_len
     if current_chunk:
-        chunks.append("\n\n=== NEXT CHAPTER ===\n\n".join(current_chunk))
+        chunks.append(delim.join(current_chunk))
     return chunks
 
 def chunk_novel_into_batches(text: str, max_chars_per_batch: int = 220000) -> List[str]:
@@ -907,17 +911,27 @@ def chunk_novel_into_batches(text: str, max_chars_per_batch: int = 220000) -> Li
         batches.append("\n\n=== NEXT CHAPTER ===\n\n".join(current_batch))
     return batches
 
-def extract_with_local_uncensored(prompt_template: str, text: str, pass_key: str, local_model: Optional[str] = None, max_chunks: int = 6) -> list:
-    chunks = chunk_text(text, max_chunk_size=35000)
+def extract_with_local_uncensored(prompt_template: str, text: str, pass_key: str, local_model: Optional[str] = None, max_chunks: int = 6, book_id: Optional[str] = None) -> list:
+    chunks = chunk_text(text, max_chunk_size=12000)
     chunks_to_process = chunks[:max_chunks]
     all_items = []
     seen_names = set()
+    # Ensure local_model points to book's fused model rather than base hermes
+    target_model = local_model
+    if not target_model or "hermes" in target_model.lower():
+        target_model = get_best_local_uncensored_model(book_id=book_id)
     for idx, ch in enumerate(chunks_to_process):
         p = prompt_template.replace("{novel_text}", ch)
-        raw = call_local_uncensored_engine(p, model=local_model)
+        raw = call_local_uncensored_engine(p, model=target_model, book_id=book_id)
         parsed = parse_llm_json(raw)
+        if not isinstance(parsed, dict):
+            parsed = {}
         items = parsed.get(pass_key, [])
+        if not isinstance(items, list):
+            items = []
         for it in items:
+            if not isinstance(it, dict):
+                continue
             name = (it.get("name_en") or it.get("name", "")).strip().lower()
             if name and name not in seen_names:
                 seen_names.add(name)
@@ -929,10 +943,22 @@ def parse_llm_json(raw: str) -> dict:
     match = re.search(r"(\{.*\})", clean, re.DOTALL)
     if match:
         clean = match.group(1)
+    else:
+        match_arr = re.search(r"(\[.*\])", clean, re.DOTALL)
+        if match_arr:
+            clean = match_arr.group(1)
     try:
-        return json.loads(clean)
+        res = json.loads(clean)
     except Exception:
-        return json_repair.loads(clean)
+        try:
+            res = json_repair.loads(clean)
+        except Exception:
+            res = {}
+    if isinstance(res, dict):
+        return res
+    elif isinstance(res, list):
+        return {"characters": res, "locations": res, "items": res}
+    return {}
 
 CHAR_PROMPT_TEMPLATE = """You are a literary analyst and narrative researcher.
 Analyze the following novel text thoroughly and extract ALL characters mentioned in the story (Pass 1: Master Characters).
@@ -1497,9 +1523,9 @@ def scan_book_gemini_endpoint(req: ScanBookGeminiRequest):
         for b_idx, batch_text in enumerate(batches_to_scan):
             chars_list = []
             if req.engine == "local_uncensored":
-                print(f"[Engine: Local Uncensored] Batch {b_idx+1}/{len(batches_to_scan)} via {req.local_model or get_best_local_uncensored_model()}...")
-                chars_list = extract_with_local_uncensored(CHAR_PROMPT_TEMPLATE, batch_text, "characters", local_model=req.local_model, max_chunks=4)
-                results["engine_used"] = "local_uncensored"
+                print(f"[Engine: Local Uncensored] Batch {b_idx+1}/{len(batches_to_scan)} for '{req.book_id}'...")
+                chars_list = extract_with_local_uncensored(CHAR_PROMPT_TEMPLATE, batch_text, "characters", local_model=req.local_model, max_chunks=4, book_id=req.book_id)
+                results["engine_used"] = "lmstudio_fused_brain"
             else:
                 use_fallback = False
                 try:
@@ -1521,9 +1547,9 @@ def scan_book_gemini_endpoint(req: ScanBookGeminiRequest):
                         raise HTTPException(status_code=500, detail=f"Gemini engine error: {str(e)}")
 
                 if use_fallback and req.engine == "hybrid":
-                    print(f"[Safety Bypass Active] Routing batch {b_idx+1} to Local Uncensored Model...")
-                    chars_list = extract_with_local_uncensored(CHAR_PROMPT_TEMPLATE, batch_text, "characters", local_model=req.local_model, max_chunks=4)
-                    results["engine_used"] = "local_uncensored_fallback"
+                    print(f"[Safety Bypass Active] Routing batch {b_idx+1} to Local Uncensored Model (LoRA if available)...")
+                    chars_list = extract_with_local_uncensored(CHAR_PROMPT_TEMPLATE, batch_text, "characters", local_model=req.local_model, max_chunks=4, book_id=req.book_id)
+                    results["engine_used"] = "lmstudio_fallback"
                     results["explicit_safety_fallback"] = True
 
             for c in chars_list:
@@ -1590,9 +1616,9 @@ def scan_book_gemini_endpoint(req: ScanBookGeminiRequest):
         for b_idx, batch_text in enumerate(batches_to_scan):
             envs_list = []
             if req.engine == "local_uncensored":
-                print(f"[Engine: Local Uncensored] Locations batch {b_idx+1}/{len(batches_to_scan)}...")
-                envs_list = extract_with_local_uncensored(ENV_PROMPT_TEMPLATE, batch_text, "locations", local_model=req.local_model, max_chunks=4)
-                results["engine_used"] = "local_uncensored"
+                print(f"[Engine: Local Uncensored] Locations batch {b_idx+1}/{len(batches_to_scan)} for '{req.book_id}'...")
+                envs_list = extract_with_local_uncensored(ENV_PROMPT_TEMPLATE, batch_text, "locations", local_model=req.local_model, max_chunks=4, book_id=req.book_id)
+                results["engine_used"] = "lmstudio_fused_brain"
             else:
                 use_fallback = False
                 try:
@@ -1614,9 +1640,9 @@ def scan_book_gemini_endpoint(req: ScanBookGeminiRequest):
                         raise HTTPException(status_code=500, detail=f"Gemini engine error: {str(e)}")
 
                 if use_fallback and req.engine == "hybrid":
-                    print(f"[Safety Bypass Active] Routing locations batch {b_idx+1} to Local Uncensored Model...")
-                    envs_list = extract_with_local_uncensored(ENV_PROMPT_TEMPLATE, batch_text, "locations", local_model=req.local_model, max_chunks=4)
-                    results["engine_used"] = "local_uncensored_fallback"
+                    print(f"[Safety Bypass Active] Routing locations batch {b_idx+1} to Local Uncensored Model (LoRA if available)...")
+                    envs_list = extract_with_local_uncensored(ENV_PROMPT_TEMPLATE, batch_text, "locations", local_model=req.local_model, max_chunks=4, book_id=req.book_id)
+                    results["engine_used"] = "lmstudio_fallback"
                     results["explicit_safety_fallback"] = True
 
             for l in envs_list:
@@ -2029,7 +2055,7 @@ def extract_description(req: ExtractRequest):
     user_prompt = f"""{instruction}\n\nPassage:\n\"\"\"{req.selected_text}\"\"\""""
 
     payload = {
-        "model": "gemma4-12b-qat-uncensored-hauhaucs-balanced@q4_k_m",
+        "model": get_best_local_uncensored_model(),
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -2134,7 +2160,7 @@ def generate_chapter_storyboard_sync(book_id: str, chapter_num: int, model: Opti
     chapter_text = "\n\n".join(formatted_paras)
     prompt = STORYBOARD_PROMPT_TEMPLATE.replace("{chapter_text}", chapter_text)
 
-    chosen_model = model or "gemma4-26b-a4b-qat-uncensored-hauhaucs-balanced-mtp@q4_k_m"
+    chosen_model = model or get_best_local_uncensored_model()
 
     payload = {
         "model": chosen_model,
@@ -2729,14 +2755,14 @@ def toggle_character_lock_endpoint(req: ToggleLockRequest):
         return {"status": "success", "is_locked": found["is_locked"]}
     raise HTTPException(status_code=404, detail="Character not found")
 
-# --- KREA 2 TURBO 1:1 FACE PORTRAIT GENERATION (COMFYUI & GEMMA 4) ---
+# --- KREA 2 TURBO 1:1 FACE PORTRAIT GENERATION (COMFYUI & NOVEL BRAIN / HERMES) ---
 
 KREA2_WORKFLOW_PATH = r"C:\Users\MiroAI\Downloads\image_krea2_turbo_t2i_int8_Character_portrait.json"
 COMFY_URL = "http://127.0.0.1:8188"
 COMFY_PORTRAITS_DIR = r"C:\ComfyUI_windows_portable\ComfyUI\output\character_portraits"
 os.makedirs(COMFY_PORTRAITS_DIR, exist_ok=True)
 
-def generate_krea_prompt_gemma4(name: str, species: str, desc: str) -> str:
+def generate_krea_prompt_llm(name: str, species: str, desc: str) -> str:
     sys_prompt = (
         "You are an elite prompt engineer specialized in Krea 2 Turbo (12B+ Vision-Language architecture) for high-speed concept character portraits.\n\n"
         "YOUR TASK:\n"
@@ -2760,7 +2786,7 @@ def generate_krea_prompt_gemma4(name: str, species: str, desc: str) -> str:
     user_prompt = f"Character: {name}\nSpecies: {species}\nPhysical Description from novel: {desc}\n\nWrite the Krea 2 Turbo face-only prompt on a pure white background:"
     
     payload = {
-        "model": "gemma4-26b-a4b-qat-uncensored-hauhaucs-balanced-mtp@q4_k_m",
+        "model": get_best_local_uncensored_model(),
         "messages": [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt}
@@ -2776,7 +2802,7 @@ def generate_krea_prompt_gemma4(name: str, species: str, desc: str) -> str:
                 prompt_text = prompt_text[1:-1]
             return prompt_text
     except Exception as e:
-        print(f"Error in Gemma 4 Krea prompt generation: {e}")
+        print(f"Error in LLM Krea prompt generation: {e}")
     
     # Fallback to deterministic Krea 2 formula if LLM is unavailable
     return (
@@ -3483,6 +3509,12 @@ def run_agent_endpoint(req: AgentRunRequest):
     import novel_production_graph
     import voiceprint_production
     try:
+        active_novel_model = get_best_local_uncensored_model(book_id=req.book_id)
+        os.environ["LLM_MODEL"] = active_novel_model
+        if hasattr(novel_production_graph, "llm"):
+            novel_production_graph.llm.model_name = active_novel_model
+        print(f"[Agent Run] Using active novel model: '{active_novel_model}' for book: '{req.book_id}'", flush=True)
+
         book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
         bible_path = get_book_bible_path(req.book_id, "character_bible.json")
@@ -3499,9 +3531,9 @@ def run_agent_endpoint(req: AgentRunRequest):
         logs = []
         for ch in chars_to_run:
             run_agent.run_for_character(app_graph, ch, txt_path, bible_path=bible_path)
-            logs.append(f"[Success] Processed {ch} via LangGraph & GraphRAG")
+            logs.append(f"[Success] Processed {ch} via LangGraph & GraphRAG ({active_novel_model})")
             try:
-                vp = voiceprint_production.extract_or_design_voiceprint(ch, txt_path)
+                vp = voiceprint_production.extract_or_design_voiceprint(ch, txt_path, book_id=req.book_id, model_name=active_novel_model)
                 voiceprint_production.lock_voiceprint_into_bible(ch, vp, bible_path=bible_path)
                 logs.append(f"[Voiceprint] Synthesized acoustic profile & original English dialogue for {ch}")
             except Exception as e_vp:
@@ -3527,30 +3559,37 @@ class VoiceprintRunRequest(BaseModel):
 
 @app.post("/api/agent/run_voiceprint")
 def run_voiceprint_endpoint(req: VoiceprintRunRequest):
-    """Run dedicated voiceprint extraction for character."""
+    """Run dedicated voiceprint extraction for character or all characters."""
     import run_agent
     import voiceprint_production
     import novel_production_graph
     try:
+        active_novel_model = get_best_local_uncensored_model(book_id=req.book_id)
+        os.environ["LLM_MODEL"] = active_novel_model
         book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
         bible_path = get_book_bible_path(req.book_id, "character_bible.json")
         target_char = req.character.strip() if req.character else ""
-        if not target_char:
+        
+        chars_to_run = []
+        if target_char:
+            chars_to_run = [target_char]
+        else:
             discovered = novel_production_graph.discover_novel_characters(txt_path)
-            target_char = discovered[0] if discovered else "Protagonist"
+            chars_to_run = discovered if discovered else ["Protagonist"]
+
+        logs = []
+        for ch in chars_to_run:
+            vp = voiceprint_production.extract_or_design_voiceprint(ch, txt_path, book_id=req.book_id, model_name=active_novel_model)
+            voiceprint_production.lock_voiceprint_into_bible(ch, vp, bible_path=bible_path)
+            logs.append(f"[Voiceprint] 5-dimension acoustic profile & quotes locked for {ch}")
             
-        vp = voiceprint_production.extract_or_design_voiceprint(target_char, txt_path)
-        voiceprint_production.lock_voiceprint_into_bible(target_char, vp, bible_path=bible_path)
         chars_res = get_agent_characters(book_id=req.book_id)
         return {
             "status": "success",
-            "message": f"Voiceprint generated for {target_char}",
+            "message": f"Voiceprint generated for {len(chars_to_run)} character(s)",
             "characters": chars_res.get("characters", []),
-            "logs": [
-                f"[Voiceprint] 5-dimension acoustic profile created for {target_char}",
-                f"[Original Dialogue] Original English lines and [Instruction:] tags extracted"
-            ]
+            "logs": logs
         }
     except Exception as e:
         return {
@@ -3569,6 +3608,12 @@ def run_environment_endpoint(req: EnvironmentRunRequest):
     import run_agent
     import environment_production_graph
     try:
+        active_novel_model = get_best_local_uncensored_model(book_id=req.book_id)
+        os.environ["LLM_MODEL"] = active_novel_model
+        if hasattr(environment_production_graph, "llm"):
+            environment_production_graph.llm.model_name = active_novel_model
+        print(f"[Environment Agent] Using active novel model: '{active_novel_model}' for book: '{req.book_id}'", flush=True)
+
         book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
         bible_path = get_book_bible_path(req.book_id, "environment_bible.json")
@@ -3635,6 +3680,12 @@ def run_script_endpoint(req: ScriptRunRequest):
     import run_agent
     import dialogue_production_graph
     try:
+        active_novel_model = get_best_local_uncensored_model(book_id=req.book_id)
+        os.environ["LLM_MODEL"] = active_novel_model
+        if hasattr(dialogue_production_graph, "llm"):
+            dialogue_production_graph.llm.model_name = active_novel_model
+        print(f"[Script Agent] Using active novel model: '{active_novel_model}' for book: '{req.book_id}'", flush=True)
+
         book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
         bible_path = get_book_bible_path(req.book_id, "script_bible.json")
@@ -3690,7 +3741,8 @@ def get_agent_scenes(book_id: Optional[str] = Query(None)):
 
 class SceneRunRequest(BaseModel):
     book_id: str
-    max_scenes: Optional[int] = 12
+    scope: Optional[str] = "all"  # "all" (auto-detect full novel) or "preview" (10 scenes)
+    max_scenes: Optional[int] = None
 
 @app.post("/api/agent/run_scenes")
 def run_scenes_endpoint(req: SceneRunRequest):
@@ -3699,14 +3751,22 @@ def run_scenes_endpoint(req: SceneRunRequest):
     import run_agent
     import scene_production_graph
     try:
+        active_novel_model = get_best_local_uncensored_model(book_id=req.book_id)
+        os.environ["LLM_MODEL"] = active_novel_model
+        if hasattr(scene_production_graph, "llm"):
+            scene_production_graph.llm.model_name = active_novel_model
+        print(f"[Scene Agent] Using active novel model: '{active_novel_model}' for book: '{req.book_id}'", flush=True)
+
         book_input = "Solar Dragons Need Love Too 1" if req.book_id and "solar" in req.book_id.lower() else req.book_id
         txt_path = run_agent.resolve_novel_text(book_input)
         bible_path = get_book_bible_path(req.book_id, "scene_bible.json")
         
+        limit = 10 if req.scope == "preview" else (req.max_scenes if req.max_scenes and req.max_scenes > 0 else None)
         app_graph = scene_production_graph.build_scene_pipeline_graph()
         initial_state = {
             "novel_text_path": txt_path,
             "target_chapter_or_query": None,
+            "max_scenes": limit,
             "raw_scene_blocks": [],
             "extracted_scenes": [],
             "is_locked": False,
@@ -3835,17 +3895,17 @@ class ComfyVoiceRequest(BaseModel):
 
 @app.post("/api/comfy/generate_voice")
 def comfy_generate_voice(req: ComfyVoiceRequest):
-    import comfy_studio_engine
-    if not comfy_studio_engine.is_comfy_online():
-        raise HTTPException(status_code=503, detail="ComfyUI server is offline on 127.0.0.1:8188")
+    import tts_engine
     try:
-        res = comfy_studio_engine.generate_voice_qwen(
+        res = tts_engine.generate_voice_audio(
             character_name=req.character_name,
             line_en=req.line_en,
             voice_description=req.voice_description,
             shot_code=req.shot_code
         )
-        return res
+        if res.get("status") == "success":
+            return res
+        raise HTTPException(status_code=500, detail=res.get("error", "Voice synthesis failed"))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -4089,35 +4149,57 @@ def get_novel_brain_status(book_id: str = Query(...)):
         proc = None
 
     # Check completed metadata first
+    result_data = None
     if os.path.exists(meta_file):
         try:
             with open(meta_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                result_data = json.load(f)
         except Exception:
             pass
 
     # If status file exists but no process is actively running, it's stale
-    if os.path.exists(status_file):
+    if not result_data and os.path.exists(status_file):
         try:
             with open(status_file, "r", encoding="utf-8") as f:
                 st = json.load(f)
-                if proc is not None:
-                    return st
-                elif st.get("status") == "completed":
-                    return st
+                if proc is not None or st.get("status") == "completed":
+                    result_data = st
         except Exception:
             pass
 
-    return {
-        "status": "untrained",
-        "progress": 0,
-        "current_step": 0,
-        "total_steps": 0,
-        "epoch": 0.0,
-        "loss": None,
-        "eta": "idle",
-        "message": "Ready to train"
-    }
+    if not result_data:
+        result_data = {
+            "status": "untrained",
+            "progress": 0,
+            "current_step": 0,
+            "total_steps": 0,
+            "epoch": 0.0,
+            "loss": None,
+            "eta": "idle",
+            "message": "Ready to train"
+        }
+
+    # Check if exported GGUF model exists in LM Studio
+    lmstudio_dir = os.path.expanduser(os.path.join("~", ".lmstudio", "models", "NovelBrain", slug))
+    gguf_path = os.path.join(lmstudio_dir, f"{slug}-Q8_0.gguf")
+    has_gguf = os.path.exists(gguf_path)
+    result_data["has_gguf"] = has_gguf
+    result_data["gguf_size_mb"] = round(os.path.getsize(gguf_path) / (1024 ** 2), 1) if has_gguf else 0
+
+    # Check if active in LM Studio
+    is_active = False
+    try:
+        r = requests.get(f"{LM_STUDIO_URL}/models", timeout=1)
+        if r.status_code == 200:
+            active_models = [m.get("id", "").lower() for m in r.json().get("data", [])]
+            for m in active_models:
+                if slug.lower() in m:
+                    is_active = True
+                    break
+    except Exception:
+        pass
+    result_data["is_active_in_lmstudio"] = is_active
+    return result_data
 
 @app.get("/api/novel/brain_logs")
 def get_novel_brain_logs(book_id: str = Query(...), offset: int = Query(0)):
@@ -4188,6 +4270,51 @@ def get_hermes_status():
         "size_mb": file_size_mb,
         "is_active_in_lmstudio": active
     }
+
+class ExportLMStudioRequest(BaseModel):
+    book_id: str
+    outtype: Optional[str] = "q8_0"
+
+@app.post("/api/novel/export_to_lmstudio")
+def export_to_lmstudio_endpoint(req: ExportLMStudioRequest):
+    """Fuses trained LoRA into base model, converts to GGUF, and moves to LM Studio models."""
+    from export_novel_to_lmstudio import export_novel_brain_to_lmstudio
+    try:
+        res = export_novel_brain_to_lmstudio(req.book_id, outtype=req.outtype)
+        slug = res["slug"]
+        lms_path = os.path.expanduser(r"~/.lmstudio/bin/lms.exe")
+        loaded = False
+        if os.path.exists(lms_path):
+            try:
+                subprocess.run([lms_path, "unload", "-a"], timeout=15)
+                load_res = subprocess.run([lms_path, "load", slug, "--gpu", "max", "-y"], capture_output=True, text=True, timeout=30)
+                loaded = (load_res.returncode == 0)
+            except Exception as e:
+                print(f"[LM Studio Load Error] {e}")
+
+        res["loaded_in_lmstudio"] = loaded
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class LoadLMStudioModelRequest(BaseModel):
+    model_identifier: str
+
+@app.post("/api/novel/load_lmstudio_model")
+def load_lmstudio_model_endpoint(req: LoadLMStudioModelRequest):
+    """Load a specific model directly into LM Studio via lms CLI."""
+    lms_path = os.path.expanduser(r"~/.lmstudio/bin/lms.exe")
+    if not os.path.exists(lms_path):
+        raise HTTPException(status_code=404, detail="lms.exe CLI not found")
+    try:
+        subprocess.run([lms_path, "unload", "-a"], timeout=15)
+        res = subprocess.run([lms_path, "load", req.model_identifier, "--gpu", "max", "-y"], capture_output=True, text=True, timeout=30)
+        if res.returncode == 0:
+            return {"status": "success", "model": req.model_identifier, "message": f"Successfully loaded {req.model_identifier} in LM Studio!"}
+        else:
+            return {"status": "error", "detail": res.stderr or res.stdout}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 app.mount("/outfits", StaticFiles(directory=COMFY_OUTFITS_DIR), name="outfits")
 app.mount("/character_outfits", StaticFiles(directory=COMFY_OUTFITS_DIR), name="character_outfits")
