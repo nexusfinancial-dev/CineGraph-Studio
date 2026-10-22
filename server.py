@@ -3431,7 +3431,9 @@ def get_agent_characters(book_id: Optional[str] = Query(None)):
                         "hair_description": ident.get("hair_description", "Canon verified"),
                         "unique_biology": ident.get("unique_biology", []),
                         "novel_quotes": ident.get("novel_quotes", []),
-                        "face_portrait_prompt": ident.get("face_portrait_prompt", ""),
+                        "face_portrait_prompt": ident.get("face_portrait_prompt", v.get("face_portrait_prompt", "")),
+                        "portrait_image": ident.get("portrait_image", v.get("portrait_image", None)),
+                        "wardrobes": ident.get("wardrobes", v.get("wardrobes", [])),
                         "voiceprint": vp if vp else None
                     })
         except Exception:
@@ -3854,10 +3856,47 @@ def comfy_generate_environment(req: ComfyEnvRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class ComfyPortraitRequest(BaseModel):
+    character_name: str
+    prompt_text: str
+    book_id: Optional[str] = ""
+    aspect_ratio: Optional[str] = "1:1 (Square)"
+
+@app.post("/api/comfy/generate_portrait")
+def comfy_generate_portrait(req: ComfyPortraitRequest):
+    import comfy_studio_engine
+    if not comfy_studio_engine.is_comfy_online():
+        raise HTTPException(status_code=503, detail="ComfyUI server is offline on 127.0.0.1:8188")
+    try:
+        res = comfy_studio_engine.generate_portrait_krea(
+            character_name=req.character_name,
+            prompt_text=req.prompt_text,
+            aspect_ratio=req.aspect_ratio or "1:1 (Square)"
+        )
+        if res.get("primary_image"):
+            bible_path = get_book_bible_path(req.book_id, "character_bible.json")
+            if os.path.exists(bible_path):
+                try:
+                    with open(bible_path, "r", encoding="utf-8") as f:
+                        b_data = json.load(f)
+                    c_key = req.character_name.lower().strip()
+                    if c_key in b_data:
+                        b_data[c_key].setdefault("identity", {})["portrait_image"] = res["primary_image"]
+                        b_data[c_key]["portrait_image"] = res["primary_image"]
+                        with open(bible_path, "w", encoding="utf-8") as f:
+                            json.dump(b_data, f, indent=2, ensure_ascii=False)
+                except Exception:
+                    pass
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 class ComfyActorOutfitRequest(BaseModel):
     character_name: str
-    portrait_filename: str
     outfit_prompt: str
+    portrait_filename: Optional[str] = ""
+    outfit_id: Optional[str] = ""
+    book_id: Optional[str] = ""
     aspect_ratio: Optional[str] = "9:16 (Portrait Widescreen)"
 
 @app.post("/api/comfy/generate_actor_outfit")
@@ -3866,13 +3905,61 @@ def comfy_generate_actor_outfit(req: ComfyActorOutfitRequest):
     if not comfy_studio_engine.is_comfy_online():
         raise HTTPException(status_code=503, detail="ComfyUI server is offline on 127.0.0.1:8188")
     try:
+        portrait_fn = (req.portrait_filename or "").strip()
+        bible_path = get_book_bible_path(req.book_id, "character_bible.json")
+        b_data = {}
+        if os.path.exists(bible_path):
+            try:
+                with open(bible_path, "r", encoding="utf-8") as f:
+                    b_data = json.load(f)
+            except Exception:
+                pass
+
+        c_key = req.character_name.lower().strip()
+        char_entry = b_data.get(c_key, {})
+        
+        # If portrait filename not explicitly supplied, find from character bible
+        if not portrait_fn:
+            p_img = char_entry.get("portrait_image") or char_entry.get("identity", {}).get("portrait_image")
+            if p_img:
+                portrait_fn = os.path.basename(p_img)
+
+        # Fallback: check character_portraits directory for cine_{slug}
+        if not portrait_fn:
+            slug = comfy_studio_engine.clean_slug(req.character_name)
+            portraits_dir = r"C:\ComfyUI_windows_portable\ComfyUI\output\character_portraits"
+            if os.path.exists(portraits_dir):
+                for f in os.listdir(portraits_dir):
+                    if f"cine_{slug}" in f and f.endswith(('.png', '.jpg', '.webp')):
+                        portrait_fn = f
+                        break
+
+        if not portrait_fn:
+            raise HTTPException(status_code=400, detail=f"No facial portrait found for {req.character_name}. Please render the face portrait first via Krea 2 Turbo!")
+
         res = comfy_studio_engine.generate_actor_outfit_krea(
             character_name=req.character_name,
-            portrait_filename=req.portrait_filename,
+            portrait_filename=portrait_fn,
             outfit_prompt=req.outfit_prompt,
             aspect_ratio=req.aspect_ratio or "9:16 (Portrait Widescreen)"
         )
+
+        # Update character wardrobe entry with generated outfit image
+        if res.get("primary_image") and b_data and c_key in b_data:
+            try:
+                wardrobes = char_entry.get("identity", {}).get("wardrobes", []) or char_entry.get("wardrobes", [])
+                for w in wardrobes:
+                    if not req.outfit_id or w.get("id") == req.outfit_id:
+                        w["outfit_image"] = res["primary_image"]
+                        break
+                with open(bible_path, "w", encoding="utf-8") as f:
+                    json.dump(b_data, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+
         return res
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

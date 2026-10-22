@@ -327,6 +327,11 @@ def lock_canonical_bible_node(state: ProductionAgentState) -> Dict[str, Any]:
     for attr, val in resolutions.items():
         identity[attr] = val
 
+    if state.get("face_portrait_prompt"):
+        identity["face_portrait_prompt"] = state["face_portrait_prompt"]
+    if state.get("wardrobes"):
+        identity["wardrobes"] = state["wardrobes"]
+
     # Save to bible database
     os.makedirs(os.path.dirname(bible_path), exist_ok=True)
     bible = {}
@@ -337,11 +342,20 @@ def lock_canonical_bible_node(state: ProductionAgentState) -> Dict[str, Any]:
         except Exception:
             bible = {}
 
+    existing_entry = bible.get(char_name.lower(), {})
+    existing_vp = existing_entry.get("voiceprint")
+
     bible[char_name.lower()] = {
         "identity": identity,
+        "face_portrait_prompt": identity.get("face_portrait_prompt", ""),
+        "portrait_image": existing_entry.get("portrait_image"),
+        "wardrobes": identity.get("wardrobes", []),
         "is_locked": True,
         "verified_by_hitl": True
     }
+    if existing_vp:
+        bible[char_name.lower()]["voiceprint"] = existing_vp
+        bible[char_name.lower()]["has_voiceprint"] = True
 
     with open(bible_path, "w", encoding="utf-8") as f:
         json.dump(bible, f, indent=2, ensure_ascii=False)
@@ -359,30 +373,66 @@ def lock_canonical_bible_node(state: ProductionAgentState) -> Dict[str, Any]:
     return {"canonical_identity": identity, "is_locked": True}
 
 def compile_visual_prompts_node(state: ProductionAgentState) -> Dict[str, Any]:
-    """Compile the immutable ComfyUI prompts with pure white studio backdrop and identity lock."""
+    """Compile the immutable ComfyUI prompts with pure white studio backdrop, and extract canonical wardrobes."""
     char_name = state["character_name"]
     identity = state.get("canonical_identity", {})
+    passages = state.get("retrieved_passages", [])
     
-    species = identity.get("species", "non-human")
-    skin = identity.get("skin_tone_and_texture", "canonical texture")
-    eyes = identity.get("eyes_description", "canonical eyes")
-    hair = identity.get("hair_description", "canonical hair")
+    species = identity.get("species", "Human")
+    skin = identity.get("skin_tone_and_texture", "natural skin")
+    eyes = identity.get("eyes_description", "natural eyes")
+    hair = identity.get("hair_description", "natural hair")
     traits = ", ".join(identity.get("unique_biology", []))
 
     face_prompt = (
         f"Tight close-up face portrait of {char_name}, a {species}. "
         f"Centered, front-facing eye-level gaze directly looking into lens. "
         f"Skin: {skin}. Eyes: {eyes}. Hair: {hair}. "
-        f"Distinctive biological features: {traits}. "
+        f"Distinctive biological features: {traits if traits else 'Grounded authentic facial anatomy'}. "
         f"Isolated on a seamless flat solid pure white studio backdrop, #FFFFFF void, "
         f"absolutely no shadows on background, no environmental scenery, "
         f"high-key clean studio portrait lighting, soft neutral diffuse softbox illumination, "
         f"zero background shadows, 85mm prime portrait lens, sharp focus on facial features, clean photographic clarity."
     )
 
-    print(f"\n[Node: CompileVisualPrompts] Compiled Face Portrait Prompt:")
-    print(f"  {face_prompt[:180]}...")
-    return {"face_portrait_prompt": face_prompt}
+    # Extract or infer canonical wardrobes from novel passages
+    wardrobe_list = []
+    clothing_keywords = ["shirt", "jacket", "coat", "suit", "pants", "jeans", "boots", "dress", "hoodie", "leather", "uniform", "t-shirt", "vest", "sweater", "cardigan", "skirt"]
+    found_wardrobe_quotes = []
+    for p in passages:
+        p_low = p.lower()
+        if any(cw in p_low for cw in clothing_keywords):
+            found_wardrobe_quotes.append(p.strip())
+
+    if found_wardrobe_quotes:
+        for idx, q_text in enumerate(found_wardrobe_quotes[:2]):
+            desc = q_text[:180] + ("..." if len(q_text) > 180 else "")
+            wardrobe_list.append({
+                "id": f"outfit_{idx + 1}",
+                "title": f"Novel Costume #{idx + 1}",
+                "description": desc,
+                "outfit_prompt": f"Cinematic full-body shot of {char_name}, {species}. Wearing: {desc}. High quality photorealistic studio lighting, 50mm lens, natural posture.",
+                "outfit_image": None
+            })
+    else:
+        wardrobe_list.append({
+            "id": "outfit_1",
+            "title": "Signature Everyday Attire",
+            "description": f"Canonical everyday garments suitable for {char_name}'s persona in the story.",
+            "outfit_prompt": f"Cinematic full-body shot of {char_name}, {species}, in their signature everyday attire. Natural studio lighting, 50mm prime lens, clean photorealistic clarity.",
+            "outfit_image": None
+        })
+
+    identity["face_portrait_prompt"] = face_prompt
+    identity["wardrobes"] = wardrobe_list
+
+    print(f"\n[Node: CompileVisualPrompts] Compiled Face Portrait Prompt & {len(wardrobe_list)} Wardrobe(s):")
+    print(f"  Portrait: {face_prompt[:120]}...")
+    return {
+        "face_portrait_prompt": face_prompt,
+        "wardrobes": wardrobe_list,
+        "canonical_identity": identity
+    }
 
 # ==========================================
 # 3. Build & Compile the LangGraph
@@ -396,17 +446,17 @@ def build_production_graph():
     builder.add_node("extract_canonical_profile", extract_canonical_profile_node)
     builder.add_node("detect_conflicts", detect_conflicts_node)
     builder.add_node("hitl_arbitration", hitl_arbitration_node)
-    builder.add_node("lock_canonical_bible", lock_canonical_bible_node)
     builder.add_node("compile_visual_prompts", compile_visual_prompts_node)
+    builder.add_node("lock_canonical_bible", lock_canonical_bible_node)
 
-    # Define Flow / Edges
+    # Define Flow / Edges: compile_visual_prompts runs BEFORE lock_canonical_bible!
     builder.add_edge(START, "retrieve_knowledge")
     builder.add_edge("retrieve_knowledge", "extract_canonical_profile")
     builder.add_edge("extract_canonical_profile", "detect_conflicts")
     builder.add_edge("detect_conflicts", "hitl_arbitration")
-    builder.add_edge("hitl_arbitration", "lock_canonical_bible")
-    builder.add_edge("lock_canonical_bible", "compile_visual_prompts")
-    builder.add_edge("compile_visual_prompts", END)
+    builder.add_edge("hitl_arbitration", "compile_visual_prompts")
+    builder.add_edge("compile_visual_prompts", "lock_canonical_bible")
+    builder.add_edge("lock_canonical_bible", END)
 
     memory = MemorySaver()
     return builder.compile(checkpointer=memory)

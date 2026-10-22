@@ -1,1 +1,78 @@
-{}
+{
+  "rocky_cavern_walls": {
+    "environment": {
+      "name": "The Runed Crystal Cavern",
+      "environment_type": "Subterranean cavern / Underground chamber",
+      "architectural_style": "Naturalistic organic rock formations featuring a sloping passage, a distinct archway entrance, and ancient arcane geometry (runes) etched into the stone surfaces.",
+      "lighting_and_atmosphere": "Initially dark and moody with flickering lantern light; transitions into a mystical atmosphere where 'gentle, azure light' emanates from the walls. The air is filled with mystical energy, featuring reflective and absorptive qualities from a central crystal focal point.",
+      "key_props_and_spatial_features": [
+        "Sloping cavern passages",
+        "Large rocky chamber",
+        "Natural archway",
+        "Ancient arcane runes flowing along the walls",
+        "An immense chunk of crystal stabbed into the opposite end of the chamber",
+        "Soot-covered wall textures from previous magical/physical activity"
+      ],
+      "sensory_details": "Cold ground, flickering shadows, soot-stained rock faces, glowing azure luminescence, and a sense of vastness within the rocky chamber.",
+      "novel_quotes": [
+        "Lantern light flickered along the rocky, cavern walls.",
+        "the cavern chamber was filled with ancient, arcane runes.",
+        "The runes along the cave walls began to fill with gentle, azure light. They illuminated the entire cavern with mystical energy.",
+        "an immense chunk of crystal had stabbed slightly into the chamber."
+      ],
+      "matte_painting_prompt": "Empty architectural wide-angle establishing master shot, 24mm anamorphic lens, grand environmental master shot, absolutely ZERO human or living characters, a vast subterranean rocky cavern with jagged walls and a sloping passage leading to a large chamber. Ancient arcane runes are etched into the stone, glowing with a gentle azure light. At the far end of the chamber, an immense chunk of crystal is stabbed into the ground, reflecting and absorbing mystical energy. Soot-stained textures on the rock faces, atmospheric illumination, 8k resolution, cinematic color grading."
+    },
+    "is_locked": true,
+    "verified_by_hitl": true
+  },
+  "sloping_passage": {
+    "environment": {
+      "name": "Sloping passage",
+      "environment_type": "Subterranean cavernous corridor",
+      "architectural_style": "Naturalistic organic rock formations; rugged, uneven cavern walls with a consistent downward incline.",
+      "lighting_and_atmosphere": "Flickering lantern light contrasting against deep shadows; tense, quiet, and mysterious atmosphere.",
+      "key_props_and_spatial_features": [
+        "Sloping floor/corridor",
+        "Rocky cavern walls",
+        "Downward incline",
+        "Deep subterranean depth"
+      ],
+      "sensory_details": "The tactile roughness of the rock, the rhythmic flicker of light against dark surfaces, and a heavy sense of silence.",
+      "novel_quotes": [
+        "Lantern light flickered along the rocky, cavern walls.",
+        "walked deeper down the sloping passage.",
+        "sloping corridor."
+      ],
+      "matte_painting_prompt": "Empty architectural wide-angle establishing master shot, 24mm anamorphic lens, grand environmental master shot of a downward-sloping subterranean cavernous corridor with rugged rocky walls, flickering lantern light sources casting long shadows into the dark, atmospheric illumination, 8k resolution, cinematic color grading, absolutely ZERO human or living characters."
+    },
+    "is_locked": true,
+    "verified_by_hitl": true
+  },
+  "stone_corridor": {
+    "environment": {
+      "name": "Stone Corridor",
+      "environment_type": "Interior / Subterranean Hallway",
+      "architectural_style": "Weathered and rustic stone masonry featuring structural repairs with wood and stone infill; characterized by linear progression with symmetrical door placements (three on each side) and a mix of open-to-elements sections and enclosed chambers.",
+      "lighting_and_atmosphere": "Atmospheric and moody, transitioning from dark shadows to firelit glows. Features long shadows, billowing smoke from burning elements, and a damp chill. The atmosphere is heavy with the visual of dripping water and the heat/smoke of burning corpses.",
+      "key_props_and_spatial_features": [
+        "Weathered stone walls with visible cracks",
+        "Moss-covered surfaces",
+        "Locked and bolted doors along both sides",
+        "Wood and stone roof infill",
+        "Burning corpses dripping ashes",
+        "Dripping water sources",
+        "Intersections leading to large chambers or sleeping quarters"
+      ],
+      "sensory_details": "The sound of small water drops echoing; a biting chill in the air; the overpowering heat and smell of smoke from burning bodies; the texture of mossy, cracked stone.",
+      "novel_quotes": [
+        "Water dripped from stone, the sound of small drops echoing along the stone corridor.",
+        "The stone was weathered, with many cracks. Moss grew on the stone and long shadows filled many places along the structure...",
+        "...the other end of the corridor glowed with firelight.",
+        "Flames shot from her hands as the corridor filled with a small amount of smoke."
+      ],
+      "matte_painting_prompt": "Empty architectural wide-angle establishing master shot, 24mm anamorphic lens, grand environmental master shot, weathered stone corridor with mossy textures and cracked masonry, doors lining both sides, long shadows stretching across the floor, firelight glowing from a distant end creating atmospheric smoke and heat haze, dripping water highlights on stone surfaces, absolutely ZERO human or living characters, atmospheric illumination, 8k resolution, cinematic color grading."
+    },
+    "is_locked": true,
+    "verified_by_hitl": true
+  }
+}

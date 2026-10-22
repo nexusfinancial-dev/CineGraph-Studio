@@ -190,6 +190,65 @@ def generate_environment_krea(
 
 
 # ==========================================
+# 2b. Character Face Portrait (Krea 2 Turbo)
+# ==========================================
+def generate_portrait_krea(
+    character_name: str,
+    prompt_text: str,
+    aspect_ratio: str = "1:1 (Square)"
+) -> Dict[str, Any]:
+    """
+    Renders 1:1 character facial portrait on pure white studio background using Krea 2 Turbo.
+    Outputs to ComfyUI output/character_portraits and returns accessible image path.
+    """
+    if not os.path.exists(WF_PORTRAIT_PATH):
+        raise FileNotFoundError(f"Portrait workflow missing: {WF_PORTRAIT_PATH}")
+
+    with open(WF_PORTRAIT_PATH, "r", encoding="utf-8") as f:
+        wf = json.load(f)
+
+    slug = clean_slug(character_name)
+    out_prefix = f"character_portraits/cine_{slug}"
+
+    # Node 53: CR Text (Prompt input)
+    if "53" in wf:
+        wf["53"]["inputs"]["text"] = prompt_text
+
+    # Node 49: ResolutionSelector
+    if "49" in wf:
+        wf["49"]["inputs"]["aspect_ratio"] = aspect_ratio
+
+    # Node 30:3: KSampler (Seed)
+    if "30:3" in wf:
+        wf["30:3"]["inputs"]["seed"] = random.randint(100000000, 999999999)
+
+    # Node 29: SaveImage
+    if "29" in wf:
+        wf["29"]["inputs"]["filename_prefix"] = out_prefix
+
+    prompt_id = submit_comfy_prompt(wf, client_id=f"portrait_{slug}")
+    result = poll_comfy_result(prompt_id, timeout_sec=120)
+
+    image_files = []
+    if result.get("status") == "success":
+        outputs = result.get("outputs", {})
+        if "29" in outputs and "images" in outputs["29"]:
+            for img in outputs["29"]["images"]:
+                fname = img.get("filename", "")
+                subfolder = img.get("subfolder", "character_portraits")
+                image_files.append(f"/portraits/{fname}" if not subfolder else f"/{subfolder}/{fname}")
+
+    return {
+        "status": result.get("status"),
+        "prompt_id": prompt_id,
+        "character": character_name,
+        "image_files": image_files,
+        "primary_image": image_files[0] if image_files else None,
+        "filename": os.path.basename(image_files[0]) if image_files else None
+    }
+
+
+# ==========================================
 # 3. Actor in Costume (Krea 2 Identity-Edit)
 # ==========================================
 def generate_actor_outfit_krea(
@@ -211,14 +270,27 @@ def generate_actor_outfit_krea(
     out_prefix = f"character_outfits/cine_{slug}"
 
     # Ensure source portrait is in ComfyUI input folder
-    src_portrait = os.path.join(COMFY_OUTPUT_DIR, "character_portraits", portrait_filename)
-    dst_portrait = os.path.join(COMFY_INPUT_DIR, portrait_filename)
-    if os.path.exists(src_portrait) and not os.path.exists(dst_portrait):
-        shutil.copy2(src_portrait, dst_portrait)
+    clean_p_name = os.path.basename(portrait_filename)
+    search_dirs = [
+        os.path.join(COMFY_OUTPUT_DIR, "character_portraits"),
+        COMFY_INPUT_DIR,
+        COMFY_OUTPUT_DIR,
+        os.path.join(BASE_DIR, "static")
+    ]
+    found_src = None
+    for s_dir in search_dirs:
+        candidate = os.path.join(s_dir, clean_p_name)
+        if os.path.exists(candidate):
+            found_src = candidate
+            break
+
+    dst_portrait = os.path.join(COMFY_INPUT_DIR, clean_p_name)
+    if found_src and not os.path.exists(dst_portrait):
+        shutil.copy2(found_src, dst_portrait)
 
     # Node 72: LoadImage (Source face portrait)
     if "72" in wf:
-        wf["72"]["inputs"]["image"] = portrait_filename
+        wf["72"]["inputs"]["image"] = clean_p_name
 
     # Node 111: CR Text (Costume & action prompt)
     if "111" in wf:
@@ -253,7 +325,8 @@ def generate_actor_outfit_krea(
         "prompt_id": prompt_id,
         "character": character_name,
         "image_files": image_files,
-        "primary_image": image_files[0] if image_files else None
+        "primary_image": image_files[0] if image_files else None,
+        "filename": os.path.basename(image_files[0]) if image_files else None
     }
 
 

@@ -1,1 +1,75 @@
-{}
+{
+  "colin": {
+    "identity": {
+      "name": "Colin",
+      "species": "Human (implied)",
+      "is_human": true,
+      "skin_tone_and_texture": "Not specified in text",
+      "hair_description": "Not specified in text",
+      "eyes_description": "Not specified in text",
+      "unique_biology": [
+        "Possesses a 'cock' (mentioned as stirring and getting hard)",
+        "Capable of 'breathing' (breath caught in his throat)"
+      ],
+      "novel_quotes": [
+        "At least this company had the decency to send a rejection letter.",
+        "Wish I had real talent as a gamer.",
+        "I spend enough on FPS games it might as well be a job.",
+        "Only if you sell a shitload of washing machines.",
+        "How the hell do you find these girls Dan... I haven’t been laid in months, you’re as broke as I am, but still you bring home total babes like that every week or two."
+      ],
+      "face_portrait_prompt": "Tight close-up face portrait of Colin, a Human (implied). Centered, front-facing eye-level gaze directly looking into lens. Skin: Not specified in text. Eyes: Not specified in text. Hair: Not specified in text. Distinctive biological features: Possesses a 'cock' (mentioned as stirring and getting hard), Capable of 'breathing' (breath caught in his throat). Isolated on a seamless flat solid pure white studio backdrop, #FFFFFF void, absolutely no shadows on background, no environmental scenery, high-key clean studio portrait lighting, soft neutral diffuse softbox illumination, zero background shadows, 85mm prime portrait lens, sharp focus on facial features, clean photographic clarity.",
+      "wardrobes": [
+        {
+          "id": "outfit_1",
+          "title": "Novel Costume #1",
+          "description": "‘Wish I had real talent as a gamer,’ he thought. ‘I spend enough time on FPS games it might as well be a job.’ Deep down though he knew he didn’t have the personality necessary to ...",
+          "outfit_prompt": "Cinematic full-body shot of Colin, Human (implied). Wearing: ‘Wish I had real talent as a gamer,’ he thought. ‘I spend enough time on FPS games it might as well be a job.’ Deep down though he knew he didn’t have the personality necessary to .... High quality photorealistic studio lighting, 50mm lens, natural posture.",
+          "outfit_image": null
+        },
+        {
+          "id": "outfit_2",
+          "title": "Novel Costume #2",
+          "description": "He heard Dan come in, followed by a girl giggling and Dan shushing her. “My roommate will hear, be quiet,” he heard. ‘Fuck,’ Colin thought, ‘I can’t even afford to go out and try t...",
+          "outfit_prompt": "Cinematic full-body shot of Colin, Human (implied). Wearing: He heard Dan come in, followed by a girl giggling and Dan shushing her. “My roommate will hear, be quiet,” he heard. ‘Fuck,’ Colin thought, ‘I can’t even afford to go out and try t.... High quality photorealistic studio lighting, 50mm lens, natural posture.",
+          "outfit_image": null
+        }
+      ]
+    },
+    "face_portrait_prompt": "Tight close-up face portrait of Colin, a Human (implied). Centered, front-facing eye-level gaze directly looking into lens. Skin: Not specified in text. Eyes: Not specified in text. Hair: Not specified in text. Distinctive biological features: Possesses a 'cock' (mentioned as stirring and getting hard), Capable of 'breathing' (breath caught in his throat). Isolated on a seamless flat solid pure white studio backdrop, #FFFFFF void, absolutely no shadows on background, no environmental scenery, high-key clean studio portrait lighting, soft neutral diffuse softbox illumination, zero background shadows, 85mm prime portrait lens, sharp focus on facial features, clean photographic clarity.",
+    "portrait_image": null,
+    "wardrobes": [
+      {
+        "id": "outfit_1",
+        "title": "Novel Costume #1",
+        "description": "‘Wish I had real talent as a gamer,’ he thought. ‘I spend enough time on FPS games it might as well be a job.’ Deep down though he knew he didn’t have the personality necessary to ...",
+        "outfit_prompt": "Cinematic full-body shot of Colin, Human (implied). Wearing: ‘Wish I had real talent as a gamer,’ he thought. ‘I spend enough time on FPS games it might as well be a job.’ Deep down though he knew he didn’t have the personality necessary to .... High quality photorealistic studio lighting, 50mm lens, natural posture.",
+        "outfit_image": null
+      },
+      {
+        "id": "outfit_2",
+        "title": "Novel Costume #2",
+        "description": "He heard Dan come in, followed by a girl giggling and Dan shushing her. “My roommate will hear, be quiet,” he heard. ‘Fuck,’ Colin thought, ‘I can’t even afford to go out and try t...",
+        "outfit_prompt": "Cinematic full-body shot of Colin, Human (implied). Wearing: He heard Dan come in, followed by a girl giggling and Dan shushing her. “My roommate will hear, be quiet,” he heard. ‘Fuck,’ Colin thought, ‘I can’t even afford to go out and try t.... High quality photorealistic studio lighting, 50mm lens, natural posture.",
+        "outfit_image": null
+      }
+    ],
+    "is_locked": true,
+    "verified_by_hitl": true,
+    "voiceprint": {
+      "character_name": "Colin",
+      "species": "Human",
+      "voiceprint_prompt": "[Male, Early 20s, Relatable Student Persona] + [Mid-range baritone, warm resonance with a slightly grainy, grounded texture] + [Moderate conversational pacing, natural rhythmic pauses for internal reflection] + [Dryly humorous, observant, and slightly self-deprecating psychological state] + [Neutral Modern English, intimate close-mic proximity to capture subtle nuances of thought]",
+      "vocal_timbre_and_pitch": "A grounded mid-range male voice. It avoids being overly 'heroic' or deep, opting instead for a relatable, everyday warmth that feels approachable and authentic.",
+      "cadence_and_pace": "Naturalistic flow. He speaks with the rhythm of someone thinking as they talk—not rushed, but capable of quick, witty delivery during jokes.",
+      "emotional_baseline": "Balanced between dry wit and sincere observation; he sounds like a 'best friend' narrator who is slightly amused by his own circumstances.",
+      "accent_and_acoustics": "Standard Neutral English. The acoustic profile should feel like a 'dry' studio recording, emphasizing the clarity of his internal monologue versus his external speech.",
+      "canonical_dialogue_samples": [
+        "‘Fuck,’ Colin thought, ‘I can’t even afford to go out and try to get laid. Don’t know how Dan finds all these chicks, he’s as broke as I am.’",
+        "“Since Dan isn’t going to introduce me, Hi I’m Colin,” he said with a wave.",
+        "“Only if you sell a shitload of washing machines,” said Colin."
+      ]
+    },
+    "has_voiceprint": true
+  }
+}

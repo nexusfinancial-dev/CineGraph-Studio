@@ -446,12 +446,104 @@
               <span class="text-xs font-mono text-gray-500">ID: {{ char.id || 'canon' }}</span>
             </div>
 
+            <!-- Face Portrait & Rendering Stage (Krea 2 Turbo Portrait Workflow) -->
+            <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-950/80 border border-gray-800">
+              <!-- Avatar Image or Placeholder -->
+              <div class="relative w-20 h-20 rounded-xl overflow-hidden bg-black/60 border border-gray-700 shrink-0 flex items-center justify-center">
+                <img v-if="char.portrait_image" :src="'/portraits/' + char.portrait_image" class="w-full h-full object-cover" />
+                <div v-else class="text-2xl text-gray-600">👤</div>
+                <div v-if="renderingPortraits[char.name]?.status === 'rendering'" class="absolute inset-0 bg-black/70 flex items-center justify-center">
+                  <span class="animate-spin text-lg">⏳</span>
+                </div>
+              </div>
+              
+              <div class="flex-1 min-w-0 flex flex-col gap-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold text-gray-300 flex items-center gap-1">
+                    <span>🎨 Face Portrait</span>
+                    <span v-if="char.portrait_image" class="text-[9px] px-1.5 py-0.2 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-700/50">Ready</span>
+                    <span v-else class="text-[9px] px-1.5 py-0.2 rounded bg-amber-900/60 text-amber-300 border border-amber-700/50">Needs Render</span>
+                  </span>
+                  <button @click="copyPrompt(char.face_portrait_prompt || '')" class="text-[10px] text-gray-400 hover:text-white" title="Copy Prompt">
+                    📋
+                  </button>
+                </div>
+                <p class="text-[10px] text-gray-500 line-clamp-1 italic">
+                  {{ char.face_portrait_prompt || 'Solid white studio portrait 1:1' }}
+                </p>
+                <button 
+                  @click="renderCharacterPortrait(char)" 
+                  :disabled="renderingPortraits[char.name]?.status === 'rendering' || !comfyOnline"
+                  class="mt-1 px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-gray-950 font-bold text-[10px] shadow transition flex items-center justify-center gap-1.5">
+                  <span v-if="renderingPortraits[char.name]?.status === 'rendering'">⏳ Rendering Krea 2...</span>
+                  <span v-else-if="char.portrait_image">🔄 Re-render Portrait</span>
+                  <span v-else>🎨 Render Face Portrait</span>
+                </button>
+              </div>
+            </div>
+
             <!-- Traits Breakdown -->
             <div class="space-y-1.5 text-xs text-gray-300 bg-gray-950/60 p-3 rounded-xl border border-gray-800/80">
               <div><strong class="text-gray-400">Skin & Complexion:</strong> <span class="text-gray-200">{{ char.skin_tone_and_texture }}</span></div>
               <div><strong class="text-gray-400">Eyes & Pupils:</strong> <span class="text-gray-200">{{ char.eyes_description }}</span></div>
               <div><strong class="text-gray-400">Hair & Style:</strong> <span class="text-gray-200">{{ char.hair_description }}</span></div>
               <div v-if="char.unique_biology && char.unique_biology.length"><strong class="text-gray-400">Racial Anatomy:</strong> <span class="text-amber-300 font-medium">{{ char.unique_biology.join(' • ') }}</span></div>
+            </div>
+
+            <!-- Canonical Wardrobes & Costumes (Krea 2 Actor Outfit Workflow) -->
+            <div class="p-3 rounded-xl bg-blue-950/20 border border-blue-800/40 flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                  <span>👗 Canonical Wardrobes & Costumes</span>
+                  <span class="text-[10px] text-gray-400 font-normal">({{ char.wardrobes ? char.wardrobes.length : 0 }})</span>
+                </span>
+                <span class="text-[10px] font-mono text-blue-400">Krea 2 Edit</span>
+              </div>
+
+              <!-- Outfits List -->
+              <div v-if="char.wardrobes && char.wardrobes.length" class="space-y-2">
+                <div v-for="outfit in char.wardrobes" :key="outfit.id" class="p-2.5 rounded-lg bg-gray-950/70 border border-gray-800 text-xs flex flex-col gap-2">
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <span class="font-bold text-gray-200 text-[11px]">{{ outfit.title }}</span>
+                      <p class="text-[10px] text-gray-400 leading-tight mt-0.5">{{ outfit.description }}</p>
+                    </div>
+                    <button @click="copyPrompt(outfit.outfit_prompt || outfit.description)" class="text-[10px] text-gray-500 hover:text-white shrink-0" title="Copy Outfit Prompt">
+                      📋
+                    </button>
+                  </div>
+
+                  <!-- Rendered outfit preview -->
+                  <div v-if="outfit.outfit_image" class="relative rounded-lg overflow-hidden border border-blue-500/30 bg-black/50">
+                    <img :src="'/character_outfits/' + outfit.outfit_image" class="w-full h-40 object-cover" />
+                    <div class="absolute bottom-1 right-1 bg-black/80 px-2 py-0.5 rounded text-[9px] font-mono text-emerald-400">
+                      ✓ In Costume
+                    </div>
+                  </div>
+
+                  <!-- Action Button -->
+                  <div class="flex items-center justify-between gap-2 pt-1 border-t border-gray-800/60">
+                    <span v-if="!char.portrait_image" class="text-[9px] text-amber-400 italic">
+                      ⚠️ Requires Face Portrait First
+                    </span>
+                    <span v-else class="text-[9px] text-gray-500 font-mono">9:16 Portrait</span>
+
+                    <button 
+                      @click="renderCharacterOutfit(char, outfit)"
+                      :disabled="!char.portrait_image || renderingOutfits[char.name + '_' + outfit.id]?.status === 'rendering' || !comfyOnline"
+                      class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-[10px] font-bold transition flex items-center gap-1 shrink-0">
+                      <span v-if="renderingOutfits[char.name + '_' + outfit.id]?.status === 'rendering'">⏳ Rendering...</span>
+                      <span v-else-if="outfit.outfit_image">🔄 Re-render Costume</span>
+                      <span v-else>👗 Render Outfit</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Fallback if no specific outfits yet -->
+              <div v-else class="p-2 rounded bg-gray-950/50 border border-gray-800/60 text-[10px] text-gray-400 text-center">
+                <span>No wardrobe items compiled yet. Re-extract character in Novel tab.</span>
+              </div>
             </div>
 
             <!-- Novel Proof Quotes -->
@@ -1242,6 +1334,8 @@ createApp({
     const renderingKeyframes = ref({});
     const renderingVideos = ref({});
     const renderingEnvs = ref({});
+    const renderingPortraits = ref({});
+    const renderingOutfits = ref({});
     const activeShotPromptTab = ref({});
     
     // Target Domain: 'character' vs 'voiceprint' vs 'environment' vs 'script'
@@ -1890,6 +1984,70 @@ createApp({
       }
     };
 
+    const renderCharacterPortrait = async (char) => {
+      const key = char.name;
+      renderingPortraits.value[key] = { status: 'rendering' };
+      addLog(`[ComfyUI] Rendering 1:1 facial portrait for ${char.name} via Krea 2 Turbo...`);
+      try {
+        const promptText = char.face_portrait_prompt || `Tight close-up face portrait of ${char.name}, a ${char.species}. Centered, front-facing eye-level gaze directly looking into lens. Isolated on a seamless flat solid pure white studio backdrop, #FFFFFF void, high-key clean studio portrait lighting, 85mm prime portrait lens, clean photographic clarity.`;
+        const res = await fetch('/api/comfy/generate_portrait', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            character_name: char.name,
+            prompt_text: promptText,
+            book_id: selectedBook.value,
+            aspect_ratio: "1:1 (Square)"
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.primary_image) {
+          char.portrait_image = data.primary_image;
+          renderingPortraits.value[key] = { status: 'success', primary_image: data.primary_image };
+          addLog(`[ComfyUI Success] Face portrait generated for ${char.name}: ${data.primary_image}`);
+        } else {
+          renderingPortraits.value[key] = { status: 'error', error: data.error || data.detail || 'Failed' };
+          addLog(`[ComfyUI Error] Portrait error: ${data.error || data.detail || 'Failed'}`);
+        }
+      } catch (err) {
+        renderingPortraits.value[key] = { status: 'error', error: err.message };
+        addLog(`[ComfyUI Error] ${err.message}`);
+      }
+    };
+
+    const renderCharacterOutfit = async (char, outfit) => {
+      const key = `${char.name}_${outfit.id}`;
+      renderingOutfits.value[key] = { status: 'rendering' };
+      addLog(`[ComfyUI] Rendering outfit "${outfit.title}" for ${char.name} via Krea 2 Identity-Edit...`);
+      try {
+        const portraitFn = char.portrait_image || '';
+        const res = await fetch('/api/comfy/generate_actor_outfit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            character_name: char.name,
+            outfit_prompt: outfit.outfit_prompt || outfit.description,
+            outfit_id: outfit.id,
+            portrait_filename: portraitFn,
+            book_id: selectedBook.value,
+            aspect_ratio: "9:16 (Portrait Widescreen)"
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.primary_image) {
+          outfit.outfit_image = data.primary_image;
+          renderingOutfits.value[key] = { status: 'success', primary_image: data.primary_image };
+          addLog(`[ComfyUI Success] Outfit rendered for ${char.name} (${outfit.title}): ${data.primary_image}`);
+        } else {
+          renderingOutfits.value[key] = { status: 'error', error: data.error || data.detail || 'Failed' };
+          addLog(`[ComfyUI Error] Outfit error: ${data.error || data.detail || 'Failed'}`);
+        }
+      } catch (err) {
+        renderingOutfits.value[key] = { status: 'error', error: err.message };
+        addLog(`[ComfyUI Error] ${err.message}`);
+      }
+    };
+
     const fileInput = ref(null);
     const isUploading = ref(false);
 
@@ -1968,6 +2126,7 @@ createApp({
       pipelineSteps, logs, logContainer, clearLogs, getLogColor, getStepClass, getStepIcon,
       lockedCharacters, lockedEnvironments, pendingConflicts, openResetModal, closeResetModal,
       executeStudioReset, runProductionAgent, resolveConflict, copyPrompt,
+      renderingPortraits, renderingOutfits, renderCharacterPortrait, renderCharacterOutfit,
       renderingVoices, renderingKeyframes, renderingVideos, renderingEnvs, activeShotPromptTab,
       renderShotVoice, renderShotKeyframe, renderShotVideo, renderEnvironmentMatte, renderScriptLineVoice,
       fileInput, isUploading, handleFileUpload
