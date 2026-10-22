@@ -161,12 +161,42 @@
             Trains a dedicated LoRA adapter on the verbatim manuscript text using <strong>Nous Hermes 3 (8B Uncensored)</strong> so the model thinks directly from inside the novel's canon.
           </p>
 
-          <!-- Training Progress Bar -->
-          <div v-if="brainStatus.status === 'training' || isTrainingBrain" class="flex flex-col gap-1 mt-1">
-            <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-              <div class="bg-purple-500 h-1.5 transition-all duration-300" :style="{ width: (brainStatus.progress || 35) + '%' }"></div>
+          <!-- Training Progress Bar & Live Metrics -->
+          <div v-if="isTrainingBrain || ['training', 'starting', 'loading_model', 'preparing', 'saving'].includes(brainStatus.status)" class="p-2.5 rounded-lg bg-black/70 border border-purple-600/50 flex flex-col gap-1.5 shadow-md">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="font-bold text-purple-300 flex items-center gap-1">
+                <span class="animate-spin text-xs">⚙️</span>
+                <span>LoRA Training</span>
+              </span>
+              <span class="font-mono font-bold text-amber-300">{{ brainStatus.progress || 5 }}%</span>
             </div>
-            <span class="text-[9px] text-purple-300 font-mono">{{ brainStatus.message || 'Fine-tuning QLoRA weights on RTX 5060 Ti...' }}</span>
+
+            <!-- Visual Gradient Progress Bar -->
+            <div class="w-full bg-gray-900 rounded-full h-2 overflow-hidden border border-purple-900/60">
+              <div class="bg-gradient-to-r from-purple-600 via-indigo-500 to-amber-400 h-full rounded-full transition-all duration-300 shadow" :style="{ width: (brainStatus.progress || 5) + '%' }"></div>
+            </div>
+
+            <!-- Step, Epoch, Loss, ETA Grid -->
+            <div class="grid grid-cols-2 gap-1 text-[9px] font-mono text-gray-300">
+              <div class="flex justify-between bg-gray-900/90 px-1.5 py-0.5 rounded border border-gray-800">
+                <span class="text-gray-500">Step:</span>
+                <span class="text-purple-300 font-bold">{{ brainStatus.current_step || 0 }}/{{ brainStatus.total_steps || '...' }}</span>
+              </div>
+              <div class="flex justify-between bg-gray-900/90 px-1.5 py-0.5 rounded border border-gray-800">
+                <span class="text-gray-500">Epoch:</span>
+                <span class="text-amber-300 font-bold">{{ brainStatus.epoch || '0.0' }}</span>
+              </div>
+              <div class="flex justify-between bg-gray-900/90 px-1.5 py-0.5 rounded border border-gray-800">
+                <span class="text-gray-500">Loss:</span>
+                <span class="text-emerald-300 font-bold">{{ brainStatus.loss !== null && brainStatus.loss !== undefined ? brainStatus.loss : '...' }}</span>
+              </div>
+              <div class="flex justify-between bg-gray-900/90 px-1.5 py-0.5 rounded border border-gray-800">
+                <span class="text-gray-500">ETA:</span>
+                <span class="text-sky-300 font-bold">{{ brainStatus.eta || 'calc...' }}</span>
+              </div>
+            </div>
+
+            <span class="text-[9px] text-purple-200/90 font-mono line-clamp-1 italic">{{ brainStatus.message || 'Executing QLoRA fine-tuning...' }}</span>
           </div>
 
           <!-- LM Studio Hermes 3 Status -->
@@ -450,6 +480,53 @@
           <button @click="activeTab = 'conflicts'" class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow transition">
             Resolve Canon Now ➡️
           </button>
+        </div>
+
+        <!-- Live Novel Brain LoRA Training Banner -->
+        <div v-if="isTrainingBrain || ['training', 'starting', 'loading_model', 'preparing', 'saving'].includes(brainStatus.status)" class="p-3.5 rounded-xl bg-gradient-to-r from-purple-950/90 via-purple-900/60 to-gray-900 border border-purple-500/60 shadow-xl flex flex-col gap-2.5 flex-shrink-0 glow-purple">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl animate-spin">🧠</span>
+              <div>
+                <h3 class="text-xs font-bold text-white flex items-center gap-2">
+                  <span>LoRA Training: {{ selectedBookInfo ? selectedBookInfo.title : selectedBook }}</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/40 font-mono">
+                    Step {{ brainStatus.current_step || 0 }} / {{ brainStatus.total_steps || '...' }}
+                  </span>
+                </h3>
+                <p class="text-[11px] text-purple-200 font-mono mt-0.5">{{ brainStatus.message || 'Executing QLoRA fine-tuning on RTX GPU...' }}</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-2xl font-black font-mono text-purple-300">{{ brainStatus.progress || 5 }}%</span>
+              <span class="text-[10px] text-gray-400 block font-mono">⏱️ ETA: {{ brainStatus.eta || 'calc...' }}</span>
+            </div>
+          </div>
+
+          <!-- Glowing Multi-Color Progress Bar -->
+          <div class="w-full bg-black/60 rounded-full h-3 overflow-hidden border border-purple-800/60 p-0.5 shadow-inner">
+            <div class="bg-gradient-to-r from-purple-600 via-indigo-500 to-amber-400 h-full rounded-full transition-all duration-300 shadow-sm" :style="{ width: (brainStatus.progress || 5) + '%' }"></div>
+          </div>
+
+          <!-- Live Metrics Grid -->
+          <div class="grid grid-cols-4 gap-2 text-[10px] font-mono">
+            <div class="bg-black/50 px-2.5 py-1 rounded-lg border border-purple-800/40 flex justify-between">
+              <span class="text-gray-400">Step:</span>
+              <span class="text-purple-300 font-bold">{{ brainStatus.current_step || 0 }} / {{ brainStatus.total_steps || '...' }}</span>
+            </div>
+            <div class="bg-black/50 px-2.5 py-1 rounded-lg border border-purple-800/40 flex justify-between">
+              <span class="text-gray-400">Epoch:</span>
+              <span class="text-amber-300 font-bold">{{ brainStatus.epoch || '0.0' }}</span>
+            </div>
+            <div class="bg-black/50 px-2.5 py-1 rounded-lg border border-purple-800/40 flex justify-between">
+              <span class="text-gray-400">Loss:</span>
+              <span class="text-emerald-300 font-bold">{{ brainStatus.loss !== null && brainStatus.loss !== undefined ? brainStatus.loss : '...' }}</span>
+            </div>
+            <div class="bg-black/50 px-2.5 py-1 rounded-lg border border-purple-800/40 flex justify-between">
+              <span class="text-gray-400">Time Left:</span>
+              <span class="text-sky-300 font-bold">{{ brainStatus.eta || 'calculating...' }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- Terminal Console Logs -->
@@ -1499,8 +1576,10 @@ createApp({
     };
 
     const getLogColor = (line) => {
-      if (line.includes('Error') || line.includes('error')) return 'text-rose-400 font-bold';
+      if (line.includes('Error') || line.includes('error') || line.includes('Failed')) return 'text-rose-400 font-bold';
       if (line.includes('Success') || line.includes('Locked')) return 'text-emerald-400 font-semibold';
+      if (line.includes('Trainer Step')) return 'text-amber-300 font-bold font-mono';
+      if (line.includes('Novel Brain') || line.includes('Training Started') || line.includes('LoRA') || line.includes('Dataset')) return 'text-purple-300 font-semibold font-mono';
       if (line.includes('Node:')) return 'text-amber-400';
       if (line.includes('HITL') || line.includes('Conflict')) return 'text-purple-400 font-bold';
       return 'text-gray-300';
@@ -2193,9 +2272,10 @@ createApp({
       }
     };
 
-    const brainStatus = ref({ status: 'untrained', progress: 0, message: '' });
+    const brainStatus = ref({ status: 'untrained', progress: 0, current_step: 0, total_steps: 0, epoch: 0.0, loss: null, eta: '', message: '' });
     const hermesStatus = ref({ is_downloaded: false, size_mb: 0, is_active_in_lmstudio: false });
     const isTrainingBrain = ref(false);
+    const brainLogOffset = ref(0);
 
     const checkBrainStatus = async () => {
       if (!selectedBook.value) return;
@@ -2203,8 +2283,23 @@ createApp({
         const res = await fetch(`/api/novel/brain_status?book_id=${encodeURIComponent(selectedBook.value)}`);
         const data = await res.json();
         brainStatus.value = data;
-        if (data.status === 'training' || data.status === 'starting' || data.status === 'loading_model') {
+        const isLive = ['training', 'starting', 'loading_model', 'preparing', 'saving'].includes(data.status);
+        if (isLive) {
           isTrainingBrain.value = true;
+          // Poll new log lines and stream directly into terminal console
+          try {
+            const lRes = await fetch(`/api/novel/brain_logs?book_id=${encodeURIComponent(selectedBook.value)}&offset=${brainLogOffset.value}`);
+            const lData = await lRes.json();
+            if (lData && lData.logs && lData.logs.length > 0) {
+              lData.logs.forEach(line => {
+                logs.value.push(line.startsWith('[') ? line : `[Novel Brain] ${line}`);
+              });
+              brainLogOffset.value = lData.offset;
+              nextTick(() => {
+                if (logContainer.value) logContainer.value.scrollTop = logContainer.value.scrollHeight;
+              });
+            }
+          } catch (err) {}
         } else {
           isTrainingBrain.value = false;
         }
@@ -2226,7 +2321,9 @@ createApp({
     const trainNovelBrain = async () => {
       if (!selectedBook.value) return;
       isTrainingBrain.value = true;
-      addLog(`[Novel Brain] Starting QLoRA fine-tuning on verbatim text for "${selectedBook.value}"...`);
+      brainLogOffset.value = 0;
+      activeTab.value = 'pipeline'; // Switch view to terminal console immediately
+      addLog(`[Novel Brain] Initializing QLoRA fine-tuning for "${selectedBookInfo.value ? selectedBookInfo.value.title : selectedBook.value}"...`);
       try {
         const res = await fetch('/api/novel/train_brain', {
           method: 'POST',
@@ -2235,7 +2332,7 @@ createApp({
         });
         const data = await res.json();
         if (data.status === 'started') {
-          addLog(`[Novel Brain] Background trainer initialized! Monitoring QLoRA progress...`);
+          addLog(`[Novel Brain] Background trainer initialized! Streaming logs and progress to console...`);
           checkBrainStatus();
         } else {
           addLog(`[Novel Brain Error] ${data.detail || 'Failed to start trainer'}`);
@@ -2272,10 +2369,10 @@ createApp({
       setInterval(() => {
         checkComfyStatus();
         checkHermesStatus();
-        if (selectedBook.value && (isTrainingBrain.value || brainStatus.value.status === 'training')) {
+        if (selectedBook.value && (isTrainingBrain.value || ['training', 'starting', 'loading_model', 'preparing', 'saving'].includes(brainStatus.value.status))) {
           checkBrainStatus();
         }
-      }, 5000);
+      }, 1500);
     });
 
     return {

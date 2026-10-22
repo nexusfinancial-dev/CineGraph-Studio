@@ -4035,18 +4035,34 @@ def train_novel_brain_endpoint(req: NovelBrainTrainRequest):
     out_dir = os.path.join(base_dir, "data", "loras", slug)
     os.makedirs(out_dir, exist_ok=True)
     status_file = os.path.join(out_dir, "train_status.json")
+    log_file = os.path.join(out_dir, "train.log")
+    
     with open(status_file, "w", encoding="utf-8") as f:
-        json.dump({"status": "starting", "progress": 2, "message": "Initializing background trainer..."}, f)
+        json.dump({
+            "status": "starting",
+            "progress": 2,
+            "current_step": 0,
+            "total_steps": 0,
+            "epoch": 0.0,
+            "loss": None,
+            "eta": "starting",
+            "message": "Initializing background trainer process..."
+        }, f, indent=2)
+
+    with open(log_file, "w", encoding="utf-8") as lf:
+        lf.write(f"[{time.strftime('%H:%M:%S')}] Background trainer spawned for '{req.book_id}'...\n")
 
     py_exe = sys.executable
     cmd = [
         py_exe,
+        "-u",
         os.path.join(base_dir, "train_novel_brain.py"),
         "--book-id", req.book_id,
         "--epochs", str(req.epochs or 2),
         "--batch-size", str(req.batch_size or 2)
     ]
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    log_fd = open(log_file, "a", encoding="utf-8", buffering=1)
+    proc = subprocess.Popen(cmd, stdout=log_fd, stderr=subprocess.STDOUT)
     ACTIVE_TRAINERS[slug] = proc
     return {"status": "started", "book_id": req.book_id, "output_dir": out_dir}
 
@@ -4088,7 +4104,46 @@ def get_novel_brain_status(book_id: str = Query(...)):
         except Exception:
             pass
 
-    return {"status": "untrained", "progress": 0, "message": "Ready to train"}
+    return {
+        "status": "untrained",
+        "progress": 0,
+        "current_step": 0,
+        "total_steps": 0,
+        "epoch": 0.0,
+        "loss": None,
+        "eta": "idle",
+        "message": "Ready to train"
+    }
+
+@app.get("/api/novel/brain_logs")
+def get_novel_brain_logs(book_id: str = Query(...), offset: int = Query(0)):
+    """Retrieve live log output lines from train.log for real-time console streaming."""
+    if not book_id:
+        return {"logs": [], "offset": 0}
+    slug = re.sub(r'[^a-zA-Z0-9_\-]+', '_', book_id).strip('_')
+    if not slug:
+        return {"logs": [], "offset": 0}
+    
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    out_dir = os.path.join(base_dir, "data", "loras", slug)
+    log_file = os.path.join(out_dir, "train.log")
+    if not os.path.exists(log_file):
+        return {"logs": [], "offset": 0}
+    
+    lines = []
+    new_offset = offset
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+            all_lines = f.readlines()
+            if offset < len(all_lines):
+                lines = [l.strip() for l in all_lines[offset:] if l.strip()]
+                new_offset = len(all_lines)
+            else:
+                new_offset = len(all_lines)
+    except Exception:
+        pass
+    
+    return {"logs": lines, "offset": new_offset}
 
 @app.post("/api/novel/load_hermes")
 def load_hermes_endpoint():
