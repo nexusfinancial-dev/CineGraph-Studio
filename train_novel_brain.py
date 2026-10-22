@@ -265,8 +265,8 @@ def train_novel_lora(
         save_strategy="no",
         report_to="none",
         dataset_text_field="text",
-        max_seq_length=max_seq_length,
-        warmup_ratio=0.05
+        max_length=max_seq_length,
+        warmup_steps=5
     )
 
     progress_cb = NovelBrainProgressCallback(status_file=status_file, epochs=epochs)
