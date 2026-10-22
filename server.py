@@ -100,6 +100,9 @@ def get_best_local_uncensored_model() -> str:
         if r.status_code == 200:
             models = [m.get("id") for m in r.json().get("data", [])]
             for m in models:
+                if "hermes" in m.lower():
+                    return m
+            for m in models:
                 if "uncensored" in m.lower() and "26b" in m.lower() and "@?" not in m:
                     return m
             for m in models:
@@ -4006,6 +4009,8 @@ def comfy_status():
     }
 
 
+ACTIVE_TRAINERS: Dict[str, Any] = {}
+
 class NovelBrainTrainRequest(BaseModel):
     book_id: str
     epochs: Optional[int] = 2
@@ -4031,7 +4036,8 @@ def train_novel_brain_endpoint(req: NovelBrainTrainRequest):
         "--epochs", str(req.epochs or 2),
         "--batch-size", str(req.batch_size or 2)
     ]
-    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ACTIVE_TRAINERS[slug] = proc
     return {"status": "started", "book_id": req.book_id, "output_dir": out_dir}
 
 @app.get("/api/novel/brain_status")
@@ -4041,19 +4047,34 @@ def get_novel_brain_status(book_id: str = Query(...)):
     out_dir = os.path.join(base_dir, "data", "loras", slug)
     status_file = os.path.join(out_dir, "train_status.json")
     meta_file = os.path.join(out_dir, "brain_meta.json")
-    if os.path.exists(status_file):
-        try:
-            with open(status_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
+
+    # Check if process is actually running in memory
+    proc = ACTIVE_TRAINERS.get(slug)
+    if proc and proc.poll() is not None:
+        del ACTIVE_TRAINERS[slug]
+        proc = None
+
+    # Check completed metadata first
     if os.path.exists(meta_file):
         try:
             with open(meta_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             pass
-    return {"status": "untrained", "progress": 0, "message": "No fine-tuned brain yet"}
+
+    # If status file exists but no process is actively running, it's stale
+    if os.path.exists(status_file):
+        try:
+            with open(status_file, "r", encoding="utf-8") as f:
+                st = json.load(f)
+                if proc is not None:
+                    return st
+                elif st.get("status") == "completed":
+                    return st
+        except Exception:
+            pass
+
+    return {"status": "untrained", "progress": 0, "message": "Ready to train"}
 
 @app.post("/api/novel/load_hermes")
 def load_hermes_endpoint():
