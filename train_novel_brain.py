@@ -5,6 +5,11 @@ Pure Verbatim Narrative Training (Zero Synthetic Hallucination)
 
 import os
 import sys
+
+# Ensure high-speed mirror and local-first fallbacks
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+
 import json
 import time
 import argparse
@@ -14,6 +19,7 @@ import torch
 from transformers import TrainerCallback
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCAL_HERMES_DIR = r"C:\Users\MiroAI\.cache\huggingface\hub\models--NousResearch--Hermes-3-Llama-3.1-8B\snapshots\896ea440e5a9e6070e3d8a2774daf2b481ab425b"
 
 def clean_slug(title: str) -> str:
     return re.sub(r'[^a-zA-Z0-9_\-]+', '_', title).strip('_')
@@ -21,6 +27,12 @@ def clean_slug(title: str) -> str:
 def resolve_novel_text(book_id: str) -> str:
     from run_agent import resolve_novel_text as runner_resolve
     return runner_resolve(book_id)
+
+def resolve_base_model_path(base_model_name: str) -> str:
+    """Resolve model path prioritizing complete offline local weights."""
+    if os.path.exists(LOCAL_HERMES_DIR) and os.path.exists(os.path.join(LOCAL_HERMES_DIR, "model.safetensors.index.json")):
+        return LOCAL_HERMES_DIR
+    return base_model_name
 
 def safe_write_status(status_file: str, data: dict):
     try:
@@ -175,7 +187,7 @@ def train_novel_lora(
         "epoch": 0.0,
         "loss": None,
         "eta": "loading model",
-        "message": f"Loading {base_model_name} in 4-bit NF4 QLoRA on GPU..."
+        "message": f"Loading Nous Hermes 3 (8B) in 4-bit NF4 QLoRA on GPU..."
     })
 
     from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
@@ -191,20 +203,29 @@ def train_novel_lora(
         bnb_4bit_use_double_quant=True
     )
 
-    print(f"[Model] Loading tokenizer for {base_model_name}...", flush=True)
-    tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
+    model_path = resolve_base_model_path(base_model_name)
+    is_local = os.path.isdir(model_path)
+
+    print(f"[Model] Loading tokenizer (source: {model_path}, local={is_local})...", flush=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_path, 
+        trust_remote_code=True,
+        local_files_only=is_local
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    print(f"[Model] Initializing 4-bit quantized base model weights on RTX GPU...", flush=True)
+    print(f"[Model] Initializing 4-bit quantized base model weights on RTX GPU (local={is_local})...", flush=True)
     model = AutoModelForCausalLM.from_pretrained(
-        base_model_name,
+        model_path,
         quantization_config=bnb_config,
         device_map="auto",
-        trust_remote_code=True
+        trust_remote_code=True,
+        local_files_only=is_local
     )
     model = prepare_model_for_kbit_training(model)
-    print(f"[Model] Base model loaded into GPU VRAM successfully.", flush=True)
+    vram_mb = model.get_memory_footprint() / 1024 / 1024
+    print(f"[Model] Base model loaded into GPU VRAM successfully ({vram_mb:.1f} MB allocated).", flush=True)
 
     # 3. LoRA Configuration
     safe_write_status(status_file, {

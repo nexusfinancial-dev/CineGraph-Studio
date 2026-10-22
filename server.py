@@ -4062,7 +4062,11 @@ def train_novel_brain_endpoint(req: NovelBrainTrainRequest):
         "--batch-size", str(req.batch_size or 2)
     ]
     log_fd = open(log_file, "a", encoding="utf-8", buffering=1)
-    proc = subprocess.Popen(cmd, stdout=log_fd, stderr=subprocess.STDOUT)
+    env = os.environ.copy()
+    env["HF_ENDPOINT"] = "https://hf-mirror.com"
+    env["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+    env["PYTHONUNBUFFERED"] = "1"
+    proc = subprocess.Popen(cmd, stdout=log_fd, stderr=subprocess.STDOUT, env=env)
     ACTIVE_TRAINERS[slug] = proc
     return {"status": "started", "book_id": req.book_id, "output_dir": out_dir}
 
