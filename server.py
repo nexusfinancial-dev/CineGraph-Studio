@@ -4006,6 +4006,95 @@ def comfy_status():
     }
 
 
+class NovelBrainTrainRequest(BaseModel):
+    book_id: str
+    epochs: Optional[int] = 2
+    batch_size: Optional[int] = 2
+
+@app.post("/api/novel/train_brain")
+def train_novel_brain_endpoint(req: NovelBrainTrainRequest):
+    """Trigger background LoRA fine-tuning for the selected novel."""
+    import subprocess
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    slug = re.sub(r'[^a-zA-Z0-9_\-]+', '_', req.book_id).strip('_')
+    out_dir = os.path.join(base_dir, "data", "loras", slug)
+    os.makedirs(out_dir, exist_ok=True)
+    status_file = os.path.join(out_dir, "train_status.json")
+    with open(status_file, "w", encoding="utf-8") as f:
+        json.dump({"status": "starting", "progress": 2, "message": "Initializing background trainer..."}, f)
+
+    py_exe = sys.executable
+    cmd = [
+        py_exe,
+        os.path.join(base_dir, "train_novel_brain.py"),
+        "--book-id", req.book_id,
+        "--epochs", str(req.epochs or 2),
+        "--batch-size", str(req.batch_size or 2)
+    ]
+    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return {"status": "started", "book_id": req.book_id, "output_dir": out_dir}
+
+@app.get("/api/novel/brain_status")
+def get_novel_brain_status(book_id: str = Query(...)):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    slug = re.sub(r'[^a-zA-Z0-9_\-]+', '_', book_id).strip('_')
+    out_dir = os.path.join(base_dir, "data", "loras", slug)
+    status_file = os.path.join(out_dir, "train_status.json")
+    meta_file = os.path.join(out_dir, "brain_meta.json")
+    if os.path.exists(status_file):
+        try:
+            with open(status_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    if os.path.exists(meta_file):
+        try:
+            with open(meta_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"status": "untrained", "progress": 0, "message": "No fine-tuned brain yet"}
+
+@app.post("/api/novel/load_hermes")
+def load_hermes_endpoint():
+    """Load Nous Hermes 3 into LM Studio via lms.exe."""
+    import subprocess
+    lms_path = os.path.expanduser(r"~/.lmstudio/bin/lms.exe")
+    if not os.path.exists(lms_path):
+        raise HTTPException(status_code=404, detail="lms.exe not found")
+    
+    gguf_path = os.path.expanduser(r"~/.lmstudio/models/NousResearch/Hermes-3-Llama-3.1-8B-GGUF/Hermes-3-Llama-3.1-8B.Q4_K_M.gguf")
+    if not os.path.exists(gguf_path):
+        return {"status": "downloading", "message": "Hermes 3 GGUF is still downloading in background..."}
+    
+    try:
+        res = subprocess.run([lms_path, "load", "NousResearch/Hermes-3-Llama-3.1-8B-GGUF", "--gpu", "max"], capture_output=True, text=True, timeout=30)
+        return {"status": "success", "output": res.stdout, "message": "Nous Hermes 3 loaded into LM Studio GPU!"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+@app.get("/api/novel/hermes_status")
+def get_hermes_status():
+    """Check if Nous Hermes 3 is downloaded and if it is active in LM Studio."""
+    gguf_path = os.path.expanduser(r"~/.lmstudio/models/NousResearch/Hermes-3-Llama-3.1-8B-GGUF/Hermes-3-Llama-3.1-8B.Q4_K_M.gguf")
+    is_downloaded = os.path.exists(gguf_path)
+    file_size_mb = round(os.path.getsize(gguf_path) / (1024 * 1024), 2) if is_downloaded else 0
+    
+    active = False
+    try:
+        r = requests.get(f"{LM_STUDIO_URL}/models", timeout=2)
+        if r.status_code == 200:
+            m_list = [m.get("id", "").lower() for m in r.json().get("data", [])]
+            active = any("hermes" in m for m in m_list)
+    except Exception:
+        pass
+    
+    return {
+        "is_downloaded": is_downloaded,
+        "size_mb": file_size_mb,
+        "is_active_in_lmstudio": active
+    }
+
 app.mount("/outfits", StaticFiles(directory=COMFY_OUTFITS_DIR), name="outfits")
 app.mount("/character_outfits", StaticFiles(directory=COMFY_OUTFITS_DIR), name="character_outfits")
 app.mount("/portraits", StaticFiles(directory=COMFY_PORTRAITS_DIR), name="portraits")

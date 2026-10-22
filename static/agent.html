@@ -145,6 +145,63 @@
           <div class="flex justify-between"><span class="text-gray-500">Format:</span> <span class="font-mono text-amber-400 uppercase">{{ selectedBookInfo.format }}</span></div>
           <div class="flex justify-between"><span class="text-gray-500">GraphRAG Index:</span> <span :class="selectedBookInfo.indexed ? 'text-emerald-400' : 'text-gray-400'">{{ selectedBookInfo.indexed ? '✅ Indexed in GraphRAG' : '⏳ Ready for Ingestion' }}</span></div>
         </div>
+
+        <!-- Novel Brain (Book-Specific LoRA / Nous Hermes 3 Uncensored) -->
+        <div class="p-3 rounded-xl bg-purple-950/20 border border-purple-800/40 flex flex-col gap-2 mt-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+              <span>🧠 Novel Brain (QLoRA)</span>
+            </span>
+            <span v-if="brainStatus.status === 'completed'" class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700/60 text-emerald-300 font-bold">✓ Brain Active</span>
+            <span v-else-if="brainStatus.status === 'training' || isTrainingBrain" class="text-[9px] px-2 py-0.5 rounded-full bg-amber-950 border border-amber-700/60 text-amber-300 font-bold animate-pulse">⏳ Training LoRA...</span>
+            <span v-else class="text-[9px] px-2 py-0.5 rounded-full bg-gray-900 border border-gray-700 text-gray-400 font-bold">Unadapted</span>
+          </div>
+
+          <p class="text-[10px] text-gray-400 leading-tight">
+            Trains a dedicated LoRA adapter on the verbatim manuscript text using <strong>Nous Hermes 3 (8B Uncensored)</strong> so the model thinks directly from inside the novel's canon.
+          </p>
+
+          <!-- Training Progress Bar -->
+          <div v-if="brainStatus.status === 'training' || isTrainingBrain" class="flex flex-col gap-1 mt-1">
+            <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+              <div class="bg-purple-500 h-1.5 transition-all duration-300" :style="{ width: (brainStatus.progress || 35) + '%' }"></div>
+            </div>
+            <span class="text-[9px] text-purple-300 font-mono">{{ brainStatus.message || 'Fine-tuning QLoRA weights on RTX 5060 Ti...' }}</span>
+          </div>
+
+          <!-- LM Studio Hermes 3 Status -->
+          <div class="p-2 rounded-lg bg-black/50 border border-gray-800 text-[10px] flex flex-col gap-1">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">Base Model:</span>
+              <span class="text-gray-200 font-mono font-bold">Nous Hermes 3 (8B)</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">LM Studio Status:</span>
+              <span v-if="hermesStatus.is_active_in_lmstudio" class="text-emerald-400 font-bold flex items-center gap-1">● Active on :1234</span>
+              <span v-else-if="hermesStatus.is_downloaded" class="text-amber-400 font-bold">Downloaded ({{ hermesStatus.size_mb }} MB)</span>
+              <span v-else class="text-sky-400 font-mono">Downloading GGUF...</span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex gap-1.5 mt-1">
+            <button 
+              @click="trainNovelBrain" 
+              :disabled="isTrainingBrain || brainStatus.status === 'training' || !selectedBook" 
+              class="flex-1 py-1.5 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-[11px] shadow transition flex items-center justify-center gap-1">
+              <span v-if="isTrainingBrain || brainStatus.status === 'training'">⏳ Training...</span>
+              <span v-else-if="brainStatus.status === 'completed'">🔄 Retrain Brain</span>
+              <span v-else>🚀 Train Novel Brain</span>
+            </button>
+            <button 
+              v-if="hermesStatus.is_downloaded && !hermesStatus.is_active_in_lmstudio"
+              @click="loadHermesToLMStudio" 
+              class="py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-[11px] border border-gray-700 transition" 
+              title="Load Hermes 3 into LM Studio">
+              ⚡ Load in LM
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Agent Scope & Targets -->
@@ -1418,6 +1475,7 @@ createApp({
       fetchScriptData(bId);
       fetchLockedScenes(bId);
       fetchLockedMicroScenes(bId);
+      checkBrainStatus();
     };
 
     const addLog = (msg) => {
@@ -2104,12 +2162,90 @@ createApp({
       }
     };
 
+    const brainStatus = ref({ status: 'untrained', progress: 0, message: '' });
+    const hermesStatus = ref({ is_downloaded: false, size_mb: 0, is_active_in_lmstudio: false });
+    const isTrainingBrain = ref(false);
+
+    const checkBrainStatus = async () => {
+      if (!selectedBook.value) return;
+      try {
+        const res = await fetch(`/api/novel/brain_status?book_id=${encodeURIComponent(selectedBook.value)}`);
+        const data = await res.json();
+        brainStatus.value = data;
+        if (data.status === 'training' || data.status === 'starting' || data.status === 'loading_model') {
+          isTrainingBrain.value = true;
+        } else {
+          isTrainingBrain.value = false;
+        }
+      } catch (e) {
+        console.error("Error fetching brain status:", e);
+      }
+    };
+
+    const checkHermesStatus = async () => {
+      try {
+        const res = await fetch('/api/novel/hermes_status');
+        const data = await res.json();
+        hermesStatus.value = data;
+      } catch (e) {
+        console.error("Error checking hermes status:", e);
+      }
+    };
+
+    const trainNovelBrain = async () => {
+      if (!selectedBook.value) return;
+      isTrainingBrain.value = true;
+      addLog(`[Novel Brain] Starting QLoRA fine-tuning on verbatim text for "${selectedBook.value}"...`);
+      try {
+        const res = await fetch('/api/novel/train_brain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ book_id: selectedBook.value, epochs: 2 })
+        });
+        const data = await res.json();
+        if (data.status === 'started') {
+          addLog(`[Novel Brain] Background trainer initialized! Monitoring QLoRA progress...`);
+          checkBrainStatus();
+        } else {
+          addLog(`[Novel Brain Error] ${data.detail || 'Failed to start trainer'}`);
+          isTrainingBrain.value = false;
+        }
+      } catch (err) {
+        addLog(`[Novel Brain Error] ${err.message}`);
+        isTrainingBrain.value = false;
+      }
+    };
+
+    const loadHermesToLMStudio = async () => {
+      addLog(`[LM Studio] Loading Nous Hermes 3 into GPU memory on 127.0.0.1:1234...`);
+      try {
+        const res = await fetch('/api/novel/load_hermes', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+          addLog(`[LM Studio Success] ${data.message}`);
+          await checkHermesStatus();
+        } else {
+          addLog(`[LM Studio Notice] ${data.message || data.detail || 'Could not auto-load'}`);
+        }
+      } catch (err) {
+        addLog(`[LM Studio Error] ${err.message}`);
+      }
+    };
+
     onMounted(async () => {
       setupDialogFallback(document.getElementById('resetModal'));
       await fetchBooks();
       onBookSelected();
       checkComfyStatus();
-      setInterval(checkComfyStatus, 15000);
+      checkHermesStatus();
+      checkBrainStatus();
+      setInterval(() => {
+        checkComfyStatus();
+        checkHermesStatus();
+        if (isTrainingBrain.value || brainStatus.value.status === 'training') {
+          checkBrainStatus();
+        }
+      }, 5000);
     });
 
     return {
@@ -2126,6 +2262,7 @@ createApp({
       pipelineSteps, logs, logContainer, clearLogs, getLogColor, getStepClass, getStepIcon,
       lockedCharacters, lockedEnvironments, pendingConflicts, openResetModal, closeResetModal,
       executeStudioReset, runProductionAgent, resolveConflict, copyPrompt,
+      brainStatus, hermesStatus, isTrainingBrain, checkBrainStatus, checkHermesStatus, trainNovelBrain, loadHermesToLMStudio,
       renderingPortraits, renderingOutfits, renderCharacterPortrait, renderCharacterOutfit,
       renderingVoices, renderingKeyframes, renderingVideos, renderingEnvs, activeShotPromptTab,
       renderShotVoice, renderShotKeyframe, renderShotVideo, renderEnvironmentMatte, renderScriptLineVoice,

@@ -199,12 +199,14 @@ def extract_canonical_profile_node(state: ProductionAgentState) -> Dict[str, Any
     evidence_text = "\n\n---\n\n".join(passages[:12])
 
     system_prompt = (
-        "You are an expert literary archivist and character continuity supervisor for a film production studio.\n"
+        "You are an expert literary archivist and character continuity supervisor for a prestigious film production studio.\n"
         "Your duty is 100% CANONICAL ACCURACY based SOLELY on the novel excerpts provided.\n"
-        "RULES:\n"
-        "1. Never invent or hallucinate traits. Every claim must have a verbatim quote.\n"
-        "2. Pay extreme attention to non-human species (e.g. Hissfolk serpentkin, Plant Nymph, High Elf).\n"
-        "3. Detail the exact skin texture (scales, plant bark, fur, skin tone) and eyes (slit pupils, color).\n"
+        "CRITICAL CINEMATIC RULES:\n"
+        "1. Strictly extract racial, fantasy, or species physical traits (e.g. skin tone, scale texture, elven ears, eye color, height, horns, tail).\n"
+        "2. FORBIDDEN: NEVER extract genitalia, sexual organs, bedroom acts, or crude anatomical descriptions into unique_biology or any trait field.\n"
+        "3. For normal humans without non-human biological features, unique_biology MUST be an empty list [].\n"
+        "4. Pay extreme attention to distinct fantasy species (e.g. Shadow Elf, Troll, Hobkin, Goblin, High Elf, Serpentkin).\n"
+        "5. Every trait must be supported by genuine physical description evidence.\n"
         "Output strictly valid JSON conforming to the requested schema."
     )
 
@@ -372,8 +374,26 @@ def lock_canonical_bible_node(state: ProductionAgentState) -> Dict[str, Any]:
     print(f"[Node: LockCanonicalBible] Saved to {bible_path} with is_locked=True.")
     return {"canonical_identity": identity, "is_locked": True}
 
+def sanitize_prompt_text(text: str) -> str:
+    """Strip vulgar anatomical terms, crude language, or prompt-breaking tokens to maintain cinematic quality."""
+    if not text:
+        return ""
+    import re
+    vulgar_terms = [
+        r'\bcock\w*\b', r'\bdick\w*\b', r'\bpuss\w*\b', r'\bvagina\w*\b',
+        r'\berect\w*\b', r'\bclit\w*\b', r'\bcum\w*\b', r'\btit\w*\b',
+        r'\bnipple\w*\b', r'\basshole\w*\b', r'\bpenetrat\w*\b',
+        r'\bmoan\w*\b', r'\bejaculat\w*\b', r'\bthrobbing\w*\b'
+    ]
+    clean = text
+    for pat in vulgar_terms:
+        clean = re.sub(pat, '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r',\s*,+', ', ', clean)
+    clean = re.sub(r'\s+', ' ', clean).strip(' ,')
+    return clean
+
 def compile_visual_prompts_node(state: ProductionAgentState) -> Dict[str, Any]:
-    """Compile the immutable ComfyUI prompts with pure white studio backdrop, and extract canonical wardrobes."""
+    """Compile high-fidelity, cinematic ComfyUI prompts and synthesize clean canonical costumes."""
     char_name = state["character_name"]
     identity = state.get("canonical_identity", {})
     passages = state.get("retrieved_passages", [])
@@ -382,44 +402,75 @@ def compile_visual_prompts_node(state: ProductionAgentState) -> Dict[str, Any]:
     skin = identity.get("skin_tone_and_texture", "natural skin")
     eyes = identity.get("eyes_description", "natural eyes")
     hair = identity.get("hair_description", "natural hair")
-    traits = ", ".join(identity.get("unique_biology", []))
+    
+    # Filter unique biology to strictly valid fantasy traits
+    raw_traits = identity.get("unique_biology", [])
+    clean_traits = []
+    for t in raw_traits:
+        s = sanitize_prompt_text(t)
+        if s and len(s) > 3 and not any(w in s.lower() for w in ["cock", "breath", "nipple", "erect"]):
+            clean_traits.append(s)
+    identity["unique_biology"] = clean_traits
+    traits_str = ", ".join(clean_traits)
 
     face_prompt = (
         f"Tight close-up face portrait of {char_name}, a {species}. "
         f"Centered, front-facing eye-level gaze directly looking into lens. "
         f"Skin: {skin}. Eyes: {eyes}. Hair: {hair}. "
-        f"Distinctive biological features: {traits if traits else 'Grounded authentic facial anatomy'}. "
+        f"Distinctive biological features: {traits_str if traits_str else 'Grounded authentic facial anatomy'}. "
         f"Isolated on a seamless flat solid pure white studio backdrop, #FFFFFF void, "
         f"absolutely no shadows on background, no environmental scenery, "
         f"high-key clean studio portrait lighting, soft neutral diffuse softbox illumination, "
         f"zero background shadows, 85mm prime portrait lens, sharp focus on facial features, clean photographic clarity."
     )
+    face_prompt = sanitize_prompt_text(face_prompt)
 
-    # Extract or infer canonical wardrobes from novel passages
+    # Use LLM to cleanly synthesize canonical costumes from novel evidence
     wardrobe_list = []
-    clothing_keywords = ["shirt", "jacket", "coat", "suit", "pants", "jeans", "boots", "dress", "hoodie", "leather", "uniform", "t-shirt", "vest", "sweater", "cardigan", "skirt"]
-    found_wardrobe_quotes = []
-    for p in passages:
-        p_low = p.lower()
-        if any(cw in p_low for cw in clothing_keywords):
-            found_wardrobe_quotes.append(p.strip())
+    evidence_text = "\n\n".join(passages[:10])
+    
+    wardrobe_prompt = (
+        f"You are a costume designer for a film adaptation of this novel.\n"
+        f"Character: {char_name} (Species: {species})\n"
+        f"Novel excerpts:\n{evidence_text[:5000]}\n\n"
+        "Identify up to 2 distinct canonical outfits/costumes worn by or appropriate for this character.\n"
+        "RULES:\n"
+        "1. Describe ONLY clothing, garments, armor, robes, fabrics, colors, and accessories.\n"
+        "2. Do NOT include dialogue, thoughts, inner monologue, or sexual descriptions.\n"
+        "3. Return ONLY a valid JSON list of objects: [{\"title\": \"...\", \"description\": \"...\", \"garments\": \"...\"}]\n"
+        "Example: [{\"title\": \"High Priestess Silk Gown\", \"description\": \"Flowing white silk dress with high hip slits and silver embroidery\", \"garments\": \"white silk flowing gown, silver stitched trims, lightweight sheer fabric\"}]"
+    )
 
-    if found_wardrobe_quotes:
-        for idx, q_text in enumerate(found_wardrobe_quotes[:2]):
-            desc = q_text[:180] + ("..." if len(q_text) > 180 else "")
-            wardrobe_list.append({
-                "id": f"outfit_{idx + 1}",
-                "title": f"Novel Costume #{idx + 1}",
-                "description": desc,
-                "outfit_prompt": f"Cinematic full-body shot of {char_name}, {species}. Wearing: {desc}. High quality photorealistic studio lighting, 50mm lens, natural posture.",
-                "outfit_image": None
-            })
-    else:
+    try:
+        res = llm.invoke([
+            {"role": "system", "content": "You are a professional cinematic costume director. Output strictly a JSON array of costume objects."},
+            {"role": "user", "content": wardrobe_prompt}
+        ])
+        raw = res.content.strip()
+        if "[" in raw and "]" in raw:
+            json_str = raw[raw.find("["):raw.rfind("]")+1]
+            costumes = json.loads(json_str)
+            for idx, c in enumerate(costumes[:2]):
+                c_title = c.get("title", f"Canonical Outfit #{idx + 1}")
+                c_desc = sanitize_prompt_text(c.get("description", ""))
+                c_garments = sanitize_prompt_text(c.get("garments", c_desc))
+                if c_garments:
+                    wardrobe_list.append({
+                        "id": f"outfit_{idx + 1}",
+                        "title": c_title,
+                        "description": c_desc,
+                        "outfit_prompt": f"Cinematic full-body shot of {char_name}, {species}. Wearing: {c_garments}. Photorealistic high-end film still, 50mm lens, studio lighting, natural posture.",
+                        "outfit_image": None
+                    })
+    except Exception as e:
+        print(f"[Node: CompileVisualPrompts] Costume synthesis LLM notice: {e}")
+
+    if not wardrobe_list:
         wardrobe_list.append({
             "id": "outfit_1",
-            "title": "Signature Everyday Attire",
-            "description": f"Canonical everyday garments suitable for {char_name}'s persona in the story.",
-            "outfit_prompt": f"Cinematic full-body shot of {char_name}, {species}, in their signature everyday attire. Natural studio lighting, 50mm prime lens, clean photorealistic clarity.",
+            "title": f"Signature {species} Attire",
+            "description": f"Canonical garments and attire appropriate for {char_name}'s persona.",
+            "outfit_prompt": f"Cinematic full-body shot of {char_name}, {species}, wearing canonical lore-accurate garments. Photorealistic high-end film still, 50mm lens, natural posture.",
             "outfit_image": None
         })
 
